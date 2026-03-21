@@ -1,4 +1,5 @@
 use crate::wsdl::{parser::WsdlParser, mapper::WsdlMapper, llm_mapper::LlmEnhancedMapper};
+use crate::cli_help::{parser::CliHelpParser, mapper::CliMapper};
 use crate::llm::client::LlmClient;
 use crate::openapi::OpenApiGenerator;
 use api_anything_common::models::*;
@@ -85,6 +86,96 @@ impl GenerationPipeline {
         }
 
         // Stage 5: 生成 OpenAPI 规范，供客户端 SDK 生成和文档展示使用
+        tracing::info!("Stage 5: Generating OpenAPI spec");
+        let openapi = OpenApiGenerator::generate(&contract);
+
+        Ok(GenerationResult {
+            contract_id: db_contract.id,
+            routes_count,
+            openapi_spec: openapi,
+        })
+    }
+
+    /// CLI 管道：解析主帮助文本和各子命令帮助，映射为统一合约后走相同的持久化和 OpenAPI 生成流程。
+    /// subcommand_helps 允许调用方按需传入子命令的详细帮助，未传入的子命令 options 列表保持为空。
+    pub async fn run_cli(
+        repo: &impl MetadataRepo,
+        project_id: Uuid,
+        program_name: &str,
+        main_help: &str,
+        subcommand_helps: &[(&str, &str)], // (name, help_text)
+    ) -> Result<GenerationResult, anyhow::Error> {
+        // Stage 1: 解析主帮助文本，获取程序名、子命令列表和全局选项
+        tracing::info!("Stage 1: Parsing CLI help");
+        let mut cli_def = CliHelpParser::parse_main(main_help)?;
+
+        // 用各子命令的详细帮助丰富 options 列表；
+        // 若子命令不在主帮助中则忽略，保证健壮性
+        for (name, help) in subcommand_helps {
+            let sub = CliHelpParser::parse_subcommand(help)?;
+            if let Some(existing) = cli_def.subcommands.iter_mut().find(|s| s.name == *name) {
+                existing.options = sub.options;
+            }
+        }
+
+        // Stage 2: 将 CLI 定义映射为统一合约，HTTP 方法由子命令名语义推断
+        tracing::info!("Stage 2: Mapping CLI to UnifiedContract");
+        let contract = CliMapper::map(&cli_def, program_name)?;
+
+        // Stage 3: 持久化合约，原始 schema 存主帮助文本，便于后续审计
+        tracing::info!("Stage 3: Persisting to metadata");
+        let db_contract = repo.create_contract(
+            project_id,
+            "1.0.0",
+            main_help,
+            &serde_json::to_value(&contract)?,
+        ).await?;
+
+        // Stage 4: 为每个子命令创建 CLI 协议绑定和路由记录。
+        // endpoint_config 携带运行时执行命令所需的 program、subcommand 和 output_format，
+        // 供 CLI 适配器（Phase2a-T4）在调度时拼接完整命令行
+        let mut routes_count = 0;
+        for op in &contract.operations {
+            let endpoint_config = serde_json::json!({
+                "program": program_name,
+                "subcommand": op.name,
+                "output_format": "json",
+            });
+
+            let binding = repo.create_backend_binding(
+                ProtocolType::Cli,
+                &endpoint_config,
+                30000,
+            ).await?;
+
+            let method = match op.http_method.as_str() {
+                "GET" => HttpMethod::Get,
+                "PUT" => HttpMethod::Put,
+                "DELETE" => HttpMethod::Delete,
+                "PATCH" => HttpMethod::Patch,
+                _ => HttpMethod::Post,
+            };
+
+            let request_schema = op.input.as_ref()
+                .map(|m| m.schema.clone())
+                .unwrap_or(serde_json::json!({}));
+            let response_schema = op.output.as_ref()
+                .map(|m| m.schema.clone())
+                .unwrap_or(serde_json::json!({}));
+
+            repo.create_route(
+                db_contract.id,
+                method,
+                &op.path,
+                &request_schema,
+                &response_schema,
+                &endpoint_config,
+                binding.id,
+            ).await?;
+            routes_count += 1;
+        }
+
+        // Stage 5: 生成 OpenAPI 规范
         tracing::info!("Stage 5: Generating OpenAPI spec");
         let openapi = OpenApiGenerator::generate(&contract);
 
