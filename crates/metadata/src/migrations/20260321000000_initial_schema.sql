@@ -1,15 +1,34 @@
 -- Custom enum types
-CREATE TYPE source_type AS ENUM ('wsdl', 'odata', 'cli', 'ssh', 'pty');
-CREATE TYPE contract_status AS ENUM ('draft', 'active', 'deprecated');
-CREATE TYPE http_method AS ENUM ('GET', 'POST', 'PUT', 'PATCH', 'DELETE');
-CREATE TYPE protocol_type AS ENUM ('soap', 'http', 'cli', 'ssh', 'pty');
-CREATE TYPE delivery_guarantee AS ENUM ('at_most_once', 'at_least_once', 'exactly_once');
-CREATE TYPE artifact_type AS ENUM ('plugin_so', 'config_yaml', 'openapi_json', 'dockerfile', 'test_suite', 'agent_prompt');
-CREATE TYPE build_status AS ENUM ('building', 'ready', 'failed');
-CREATE TYPE delivery_status AS ENUM ('pending', 'delivered', 'failed', 'dead');
-CREATE TYPE sandbox_mode AS ENUM ('mock', 'replay', 'proxy');
+-- IF NOT EXISTS 保证迁移脚本幂等，避免数据库中已存在类型时报错
+DO $$ BEGIN
+    CREATE TYPE source_type AS ENUM ('wsdl', 'odata', 'cli', 'ssh', 'pty');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+    CREATE TYPE contract_status AS ENUM ('draft', 'active', 'deprecated');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+    CREATE TYPE http_method AS ENUM ('GET', 'POST', 'PUT', 'PATCH', 'DELETE');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+    CREATE TYPE protocol_type AS ENUM ('soap', 'http', 'cli', 'ssh', 'pty');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+    CREATE TYPE delivery_guarantee AS ENUM ('at_most_once', 'at_least_once', 'exactly_once');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+    CREATE TYPE artifact_type AS ENUM ('plugin_so', 'config_yaml', 'openapi_json', 'dockerfile', 'test_suite', 'agent_prompt');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+    CREATE TYPE build_status AS ENUM ('building', 'ready', 'failed');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+    CREATE TYPE delivery_status AS ENUM ('pending', 'delivered', 'failed', 'dead');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+    CREATE TYPE sandbox_mode AS ENUM ('mock', 'replay', 'proxy');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TABLE projects (
+CREATE TABLE IF NOT EXISTS projects (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name        VARCHAR(255) NOT NULL UNIQUE,
     description TEXT NOT NULL DEFAULT '',
@@ -20,7 +39,7 @@ CREATE TABLE projects (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE contracts (
+CREATE TABLE IF NOT EXISTS contracts (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id      UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     version         VARCHAR(50) NOT NULL,
@@ -32,7 +51,7 @@ CREATE TABLE contracts (
     UNIQUE (project_id, version)
 );
 
-CREATE TABLE backend_bindings (
+CREATE TABLE IF NOT EXISTS backend_bindings (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     protocol                protocol_type NOT NULL,
     endpoint_config         JSONB NOT NULL DEFAULT '{}',
@@ -44,7 +63,7 @@ CREATE TABLE backend_bindings (
     auth_mapping            JSONB NOT NULL DEFAULT '{}'
 );
 
-CREATE TABLE routes (
+CREATE TABLE IF NOT EXISTS routes (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     contract_id         UUID NOT NULL REFERENCES contracts(id) ON DELETE CASCADE,
     method              http_method NOT NULL,
@@ -59,7 +78,7 @@ CREATE TABLE routes (
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE artifacts (
+CREATE TABLE IF NOT EXISTS artifacts (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     contract_id     UUID NOT NULL REFERENCES contracts(id) ON DELETE CASCADE,
     artifact_type   artifact_type NOT NULL,
@@ -70,7 +89,7 @@ CREATE TABLE artifacts (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE delivery_records (
+CREATE TABLE IF NOT EXISTS delivery_records (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     route_id          UUID NOT NULL REFERENCES routes(id),
     trace_id          VARCHAR(64) NOT NULL,
@@ -85,7 +104,7 @@ CREATE TABLE delivery_records (
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE idempotency_keys (
+CREATE TABLE IF NOT EXISTS idempotency_keys (
     idempotency_key VARCHAR(255) PRIMARY KEY,
     route_id        UUID NOT NULL REFERENCES routes(id),
     status          VARCHAR(20) NOT NULL DEFAULT 'pending',
@@ -93,7 +112,7 @@ CREATE TABLE idempotency_keys (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE sandbox_sessions (
+CREATE TABLE IF NOT EXISTS sandbox_sessions (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id  UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     tenant_id   VARCHAR(255) NOT NULL,
@@ -103,7 +122,7 @@ CREATE TABLE sandbox_sessions (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE recorded_interactions (
+CREATE TABLE IF NOT EXISTS recorded_interactions (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id  UUID NOT NULL REFERENCES sandbox_sessions(id) ON DELETE CASCADE,
     route_id    UUID NOT NULL REFERENCES routes(id),
@@ -114,15 +133,16 @@ CREATE TABLE recorded_interactions (
 );
 
 -- Indexes
-CREATE INDEX idx_contracts_project_id ON contracts(project_id);
-CREATE INDEX idx_routes_contract_id ON routes(contract_id);
-CREATE INDEX idx_routes_enabled ON routes(enabled) WHERE enabled = true;
-CREATE INDEX idx_artifacts_contract_id ON artifacts(contract_id);
-CREATE INDEX idx_delivery_records_status ON delivery_records(status) WHERE status IN ('pending', 'failed');
-CREATE INDEX idx_delivery_records_next_retry ON delivery_records(next_retry_at) WHERE status = 'failed' AND next_retry_at IS NOT NULL;
-CREATE INDEX idx_delivery_records_route_id ON delivery_records(route_id);
-CREATE INDEX idx_sandbox_sessions_project ON sandbox_sessions(project_id);
-CREATE INDEX idx_recorded_interactions_session ON recorded_interactions(session_id);
+-- IF NOT EXISTS 保证索引创建幂等，多次运行迁移脚本不会报错
+CREATE INDEX IF NOT EXISTS idx_contracts_project_id ON contracts(project_id);
+CREATE INDEX IF NOT EXISTS idx_routes_contract_id ON routes(contract_id);
+CREATE INDEX IF NOT EXISTS idx_routes_enabled ON routes(enabled) WHERE enabled = true;
+CREATE INDEX IF NOT EXISTS idx_artifacts_contract_id ON artifacts(contract_id);
+CREATE INDEX IF NOT EXISTS idx_delivery_records_status ON delivery_records(status) WHERE status IN ('pending', 'failed');
+CREATE INDEX IF NOT EXISTS idx_delivery_records_next_retry ON delivery_records(next_retry_at) WHERE status = 'failed' AND next_retry_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_delivery_records_route_id ON delivery_records(route_id);
+CREATE INDEX IF NOT EXISTS idx_sandbox_sessions_project ON sandbox_sessions(project_id);
+CREATE INDEX IF NOT EXISTS idx_recorded_interactions_session ON recorded_interactions(session_id);
 
 -- Auto-update trigger for updated_at
 CREATE OR REPLACE FUNCTION update_updated_at()
@@ -133,7 +153,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- 触发器不支持 IF NOT EXISTS，通过先删后建保证幂等
+DROP TRIGGER IF EXISTS trg_projects_updated_at ON projects;
 CREATE TRIGGER trg_projects_updated_at BEFORE UPDATE ON projects FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+DROP TRIGGER IF EXISTS trg_contracts_updated_at ON contracts;
 CREATE TRIGGER trg_contracts_updated_at BEFORE UPDATE ON contracts FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+DROP TRIGGER IF EXISTS trg_routes_updated_at ON routes;
 CREATE TRIGGER trg_routes_updated_at BEFORE UPDATE ON routes FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+DROP TRIGGER IF EXISTS trg_delivery_records_updated_at ON delivery_records;
 CREATE TRIGGER trg_delivery_records_updated_at BEFORE UPDATE ON delivery_records FOR EACH ROW EXECUTE FUNCTION update_updated_at();
