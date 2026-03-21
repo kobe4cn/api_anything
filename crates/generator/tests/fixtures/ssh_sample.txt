@@ -1,0 +1,32 @@
+# SSH Interaction Sample
+# Host: 10.0.1.50
+# User: admin
+# Description: Network switch management commands
+
+## Command: show interfaces status
+## Description: List all network interfaces with their status
+## Output Format: table
+## Sample Output:
+Port      Name     Status    Speed    Duplex
+Gi0/1     uplink   connected 1000M    full
+Gi0/2     server1  connected 1000M    full
+Gi0/3     -        notconnect auto    auto
+
+## Command: show vlan brief
+## Description: List VLAN configuration
+## Output Format: table
+## Sample Output:
+VLAN  Name           Status    Ports
+1     default        active    Gi0/1, Gi0/2
+10    management     active    Gi0/3
+20    production     active    Gi0/4, Gi0/5
+
+## Command: show running-config interface {interface}
+## Description: Show configuration for a specific interface
+## Output Format: text
+## Sample Output:
+interface GigabitEthernet0/1
+ description uplink
+ switchport mode trunk
+ speed 1000
+ duplex full
