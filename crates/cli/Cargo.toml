@@ -5,8 +5,14 @@ edition.workspace = true
 
 [dependencies]
 api-anything-common = { path = "../common" }
+api-anything-metadata = { path = "../metadata" }
+api-anything-generator = { path = "../generator" }
 clap.workspace = true
 tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
+sqlx.workspace = true
+dotenvy.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
