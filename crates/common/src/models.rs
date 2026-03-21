@@ -214,6 +214,30 @@ pub struct RecordedInteraction {
     pub recorded_at: DateTime<Utc>,
 }
 
+/// 路由 + 后端绑定的联合查询结果（网关启动时加载路由表用）
+/// 通过一次 JOIN 查询避免 N+1 问题，减少网关启动时的数据库往返次数
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct RouteWithBinding {
+    pub route_id: Uuid,
+    pub contract_id: Uuid,
+    #[sqlx(rename = "method")]
+    pub method: HttpMethod,
+    pub path: String,
+    pub request_schema: serde_json::Value,
+    pub response_schema: serde_json::Value,
+    pub transform_rules: serde_json::Value,
+    pub delivery_guarantee: DeliveryGuarantee,
+    pub binding_id: Uuid,
+    pub protocol: ProtocolType,
+    pub endpoint_config: serde_json::Value,
+    pub connection_pool_config: serde_json::Value,
+    pub circuit_breaker_config: serde_json::Value,
+    pub rate_limit_config: serde_json::Value,
+    pub retry_config: serde_json::Value,
+    pub timeout_ms: i64,
+    pub auth_mapping: serde_json::Value,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

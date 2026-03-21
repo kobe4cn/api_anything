@@ -85,4 +85,28 @@ impl MetadataRepo for PgMetadataRepo {
         }
         Ok(())
     }
+
+    async fn list_active_routes_with_bindings(&self) -> Result<Vec<RouteWithBinding>, AppError> {
+        // 使用运行时查询而非宏，避免编译时对 enum 联合类型注解的复杂依赖
+        // JOIN 查询确保只返回已配置后端绑定的路由，孤立路由不会出现在路由表中
+        let rows = sqlx::query_as::<_, RouteWithBinding>(
+            r#"
+            SELECT
+                r.id as route_id, r.contract_id,
+                r.method as method,
+                r.path, r.request_schema, r.response_schema, r.transform_rules,
+                r.delivery_guarantee as delivery_guarantee,
+                bb.id as binding_id,
+                bb.protocol as protocol,
+                bb.endpoint_config, bb.connection_pool_config, bb.circuit_breaker_config,
+                bb.rate_limit_config, bb.retry_config, bb.timeout_ms, bb.auth_mapping
+            FROM routes r
+            JOIN backend_bindings bb ON r.backend_binding_id = bb.id
+            WHERE r.enabled = true
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
 }

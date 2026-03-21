@@ -156,10 +156,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "api-anything-common",
+ "api-anything-gateway",
  "api-anything-metadata",
  "assert-json-diff",
  "axum 0.8.8",
  "axum-test",
+ "dashmap",
  "dotenvy",
  "opentelemetry",
  "opentelemetry-otlp",

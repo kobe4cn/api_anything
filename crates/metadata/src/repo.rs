@@ -8,4 +8,6 @@ pub trait MetadataRepo: Send + Sync {
     async fn get_project(&self, id: Uuid) -> Result<Project, AppError>;
     async fn list_projects(&self) -> Result<Vec<Project>, AppError>;
     async fn delete_project(&self, id: Uuid) -> Result<(), AppError>;
+    /// 加载所有已启用路由及其后端绑定，供网关启动时填充动态路由表
+    async fn list_active_routes_with_bindings(&self) -> Result<Vec<RouteWithBinding>, AppError>;
 }
