@@ -118,6 +118,7 @@ dependencies = [
 name = "api-anything-gateway"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "api-anything-common",
  "api-anything-metadata",
  "arc-swap",
@@ -125,6 +126,7 @@ dependencies = [
  "axum 0.8.8",
  "chrono",
  "dashmap",
+ "quick-xml",
  "reqwest",
  "serde",
  "serde_json",
