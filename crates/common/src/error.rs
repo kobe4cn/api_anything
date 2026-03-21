@@ -71,6 +71,17 @@ pub enum AppError {
     // 而不是将其混入 BadRequest 或 Internal
     #[error("Rate limited")]
     RateLimited,
+    // 熔断器打开时拒绝请求，避免继续向已知故障的后端施压
+    #[error("Circuit breaker open: {0}")]
+    CircuitBreakerOpen(String),
+    // 区分超时（504）和不可达（502），方便客户端按不同策略重试
+    #[error("Backend timeout after {timeout_ms}ms")]
+    BackendTimeout { timeout_ms: u64 },
+    #[error("Backend unavailable: {0}")]
+    BackendUnavailable(String),
+    // 保留原始 status 供日志和告警使用，detail 对外暴露但不泄露内部实现
+    #[error("Backend error: status={status}, detail={detail}")]
+    BackendError { status: u16, detail: String },
 }
 
 impl IntoResponse for AppError {
@@ -90,6 +101,42 @@ impl IntoResponse for AppError {
                     title: "Too Many Requests".to_string(),
                     status: 429,
                     detail: Some("Rate limit exceeded".to_string()),
+                    instance: None,
+                }.into_response()
+            }
+            AppError::CircuitBreakerOpen(msg) => {
+                ProblemDetail {
+                    error_type: "about:blank".to_string(),
+                    title: "Service Unavailable".to_string(),
+                    status: 503,
+                    detail: Some(msg),
+                    instance: None,
+                }.into_response()
+            }
+            AppError::BackendTimeout { timeout_ms } => {
+                ProblemDetail {
+                    error_type: "about:blank".to_string(),
+                    title: "Gateway Timeout".to_string(),
+                    status: 504,
+                    detail: Some(format!("Backend timeout after {}ms", timeout_ms)),
+                    instance: None,
+                }.into_response()
+            }
+            AppError::BackendUnavailable(msg) => {
+                ProblemDetail {
+                    error_type: "about:blank".to_string(),
+                    title: "Bad Gateway".to_string(),
+                    status: 502,
+                    detail: Some(msg),
+                    instance: None,
+                }.into_response()
+            }
+            AppError::BackendError { status, detail } => {
+                ProblemDetail {
+                    error_type: "about:blank".to_string(),
+                    title: "Bad Gateway".to_string(),
+                    status: 502,
+                    detail: Some(format!("status={}, detail={}", status, detail)),
                     instance: None,
                 }.into_response()
             }
