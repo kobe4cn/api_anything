@@ -4,26 +4,12 @@ pub mod state;
 
 use axum::routing::{any, delete, get, post};
 use axum::Router;
-use api_anything_gateway::dispatcher::BackendDispatcher;
-use api_anything_gateway::router::DynamicRouter;
-use api_anything_metadata::PgMetadataRepo;
-use dashmap::DashMap;
-use sqlx::PgPool;
 use state::AppState;
-use std::sync::Arc;
 use tower_http::trace::TraceLayer;
-use uuid::Uuid;
 
-// build_app 暴露为公共函数，使集成测试可以在不启动 TcpListener 的情况下
-// 直接构造 Router，避免端口占用和并发冲突；
-// gateway 组件（router/dispatchers）在此初始化为空表，
-// 运行时由路由加载任务动态填充
-pub fn build_app(pool: PgPool) -> Router {
-    let repo = Arc::new(PgMetadataRepo::new(pool.clone()));
-    let router = Arc::new(DynamicRouter::new());
-    let dispatchers: Arc<DashMap<Uuid, Arc<BackendDispatcher>>> = Arc::new(DashMap::new());
-    let state = AppState { db: pool, repo, router, dispatchers };
-
+// build_app 接受已初始化的 AppState，使 main.rs 可在启动前先执行路由加载，
+// 测试代码也可以传入预填充的 state 来验证特定场景
+pub fn build_app(state: AppState) -> Router {
     Router::new()
         .route("/health", get(routes::health::health))
         .route("/health/ready", get(routes::health::ready))

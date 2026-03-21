@@ -6,3 +6,4 @@ pub mod dispatcher;
 pub mod router;
 pub mod xml_json;
 pub mod adapters;
+pub mod loader;
