@@ -729,4 +729,4 @@ OTel Collector Processors：
 | 容器 | Docker (musl-libc, FROM scratch) | < 20MB 极轻量镜像 |
 | 编排 | Kubernetes + HPA | 弹性伸缩 |
 | 监控 | Grafana + Tempo + Prometheus + Loki + Thanos | 统一可观测性 |
-| LLM | 多模型适配层（Claude/OpenAI/DeepSeek） | 离线契约解析和代码生成 |
+| LLM | 多模型适配层（Claude/OpenAI/Gemini/DeepSeek/GLM/Kimi/Qwen） | 离线契约解析和代码生成 |
