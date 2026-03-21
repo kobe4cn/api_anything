@@ -1,0 +1,6 @@
+[toolchain]
+# 使用最新稳定版编译；workspace.package.rust-version = "1.82" 声明的是最低支持版本（MSRV），
+# 而 toolchain channel 决定实际使用的编译器版本。
+# 现有生态中 clap/home 等依赖的新版本已使用 edition2024，需要 rustc >= 1.85 才能解析。
+channel = "stable"
+components = ["rustfmt", "clippy"]

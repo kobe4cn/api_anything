@@ -1,1 +1,22 @@
 .superpowers/
+
+# Rust
+/target
+**/*.rs.bk
+
+# Environment
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Docker volumes
+docker/data/
+
+# Generated artifacts
+artifacts/

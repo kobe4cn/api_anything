@@ -1,0 +1,12 @@
+[package]
+name = "api-anything-cli"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+api-anything-common = { path = "../common" }
+clap.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true

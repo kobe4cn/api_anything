@@ -1,0 +1,18 @@
+[package]
+name = "api-anything-metadata"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+api-anything-common = { path = "../common" }
+sqlx.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+assert-json-diff.workspace = true
