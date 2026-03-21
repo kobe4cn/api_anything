@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 api-anything-common = { path = "../common" }
 api-anything-metadata = { path = "../metadata" }
+api-anything-gateway = { path = "../gateway" }
 axum.workspace = true
 tokio.workspace = true
 tower.workspace = true
@@ -22,6 +23,7 @@ opentelemetry-otlp.workspace = true
 tracing-opentelemetry.workspace = true
 dotenvy.workspace = true
 anyhow.workspace = true
+dashmap.workspace = true
 
 [dev-dependencies]
 # axum-test 17+ 才支持 axum 0.8；16.x 依赖 axum 0.7，与工作区不兼容
