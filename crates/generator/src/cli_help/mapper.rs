@@ -177,9 +177,21 @@ fn capitalize(s: &str) -> String {
     }
 }
 
-/// 将任意字符串转换为 kebab-case，处理带连字符的程序名（如 report-gen 保持不变）
+/// 将程序名或路径转换为适合 URL 路径段的 kebab-case slug；
+/// 当传入绝对路径时提取 basename 并去除扩展名（如 /path/to/mock-report-gen.sh → mock-report-gen），
+/// 使生成的 REST 路径不依赖部署环境的目录结构
 fn to_kebab(s: &str) -> String {
-    s.to_lowercase()
+    // 若字符串包含路径分隔符，则认为是文件路径，取 basename 并去掉扩展名
+    let base = if s.contains('/') || s.contains('\\') {
+        let stem = std::path::Path::new(s)
+            .file_stem()
+            .and_then(|os| os.to_str())
+            .unwrap_or(s);
+        stem
+    } else {
+        s
+    };
+    base.to_lowercase()
 }
 
 #[cfg(test)]

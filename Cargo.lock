@@ -136,6 +136,7 @@ dependencies = [
  "chrono",
  "dashmap",
  "quick-xml",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
