@@ -6,6 +6,7 @@ members = [
     "crates/platform-api",
     "crates/cli",
     "crates/gateway",
+    "crates/generator",
 ]
 
 [workspace.package]
@@ -55,3 +56,6 @@ assert-json-diff = "2"
 # Gateway
 arc-swap = "1"
 dashmap = "6"
+
+# XML parsing
+quick-xml = { version = "0.37", features = ["serialize"] }
