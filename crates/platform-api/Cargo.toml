@@ -29,3 +29,9 @@ dashmap.workspace = true
 # axum-test 17+ 才支持 axum 0.8；16.x 依赖 axum 0.7，与工作区不兼容
 axum-test = "17"
 assert-json-diff.workspace = true
+# wiremock 用于 E2E 测试中模拟 SOAP 后端，无需真实外部服务
+wiremock = "0.6"
+# generator 和 gateway 作为 dev 依赖，仅 E2E 测试需要完整的流水线调用；
+# 两者均已存在于工作区 workspace，此处仅声明路径引用
+api-anything-generator = { path = "../generator" }
+api-anything-gateway = { path = "../gateway" }
