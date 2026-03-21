@@ -104,10 +104,13 @@ dependencies = [
 name = "api-anything-common"
 version = "0.1.0"
 dependencies = [
+ "axum 0.8.8",
  "chrono",
  "serde",
  "serde_json",
+ "sqlx",
  "thiserror 2.0.18",
+ "tracing",
  "uuid",
 ]
 
