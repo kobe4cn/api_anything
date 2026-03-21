@@ -98,8 +98,7 @@ impl MetadataRepo for PgMetadataRepo {
             r#"
             INSERT INTO contracts (project_id, version, original_schema, parsed_model)
             VALUES ($1, $2, $3, $4)
-            RETURNING id, project_id, version,
-                      status as "status: ContractStatus",
+            RETURNING id, project_id, version, status,
                       original_schema, parsed_model, created_at, updated_at
             "#,
         )
@@ -131,8 +130,7 @@ impl MetadataRepo for PgMetadataRepo {
             r#"
             INSERT INTO backend_bindings (protocol, endpoint_config, timeout_ms)
             VALUES ($1::protocol_type, $2, $3)
-            RETURNING id,
-                      protocol as "protocol: ProtocolType",
+            RETURNING id, protocol,
                       endpoint_config, connection_pool_config, circuit_breaker_config,
                       rate_limit_config, retry_config, timeout_ms, auth_mapping
             "#,
@@ -167,11 +165,9 @@ impl MetadataRepo for PgMetadataRepo {
             r#"
             INSERT INTO routes (contract_id, method, path, request_schema, response_schema, transform_rules, backend_binding_id)
             VALUES ($1, $2::http_method, $3, $4, $5, $6, $7)
-            RETURNING id, contract_id,
-                      method as "method: HttpMethod",
+            RETURNING id, contract_id, method,
                       path, request_schema, response_schema, transform_rules,
-                      backend_binding_id,
-                      delivery_guarantee as "delivery_guarantee: DeliveryGuarantee",
+                      backend_binding_id, delivery_guarantee,
                       enabled, created_at, updated_at
             "#,
         )
