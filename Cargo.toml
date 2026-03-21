@@ -5,6 +5,7 @@ members = [
     "crates/metadata",
     "crates/platform-api",
     "crates/cli",
+    "crates/gateway",
 ]
 
 [workspace.package]
@@ -50,3 +51,7 @@ clap = { version = "4", features = ["derive"] }
 
 # Testing
 assert-json-diff = "2"
+
+# Gateway
+arc-swap = "1"
+dashmap = "6"
