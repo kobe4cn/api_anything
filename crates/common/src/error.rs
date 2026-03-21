@@ -67,6 +67,10 @@ pub enum AppError {
     Database(#[from] sqlx::Error),
     #[error("Internal error: {0}")]
     Internal(String),
+    // 限流错误独立为枚举变体，便于 IntoResponse 返回标准 HTTP 429，
+    // 而不是将其混入 BadRequest 或 Internal
+    #[error("Rate limited")]
+    RateLimited,
 }
 
 impl IntoResponse for AppError {
@@ -80,6 +84,15 @@ impl IntoResponse for AppError {
                 ProblemDetail::internal("Database error").into_response()
             }
             AppError::Internal(msg) => ProblemDetail::internal(msg).into_response(),
+            AppError::RateLimited => {
+                ProblemDetail {
+                    error_type: "about:blank".to_string(),
+                    title: "Too Many Requests".to_string(),
+                    status: 429,
+                    detail: Some("Rate limit exceeded".to_string()),
+                    instance: None,
+                }.into_response()
+            }
         }
     }
 }
