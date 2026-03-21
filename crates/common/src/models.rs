@@ -116,7 +116,7 @@ pub struct Project {
 }
 
 // parsed_model 保存解析后的中间表示，避免每次请求时重新解析原始 schema
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Contract {
     pub id: Uuid,
     pub project_id: Uuid,
@@ -130,7 +130,7 @@ pub struct Contract {
 
 // transform_rules 以 JSON 存储字段映射规则，支持在不修改代码的情况下
 // 调整请求/响应的字段名、格式转换等行为
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Route {
     pub id: Uuid,
     pub contract_id: Uuid,
@@ -148,7 +148,7 @@ pub struct Route {
 
 // 各类配置（连接池、熔断、限流、重试）以 JSON 存储，
 // 方便针对不同后端协议使用不同的配置 schema 而无需多张配置表
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct BackendBinding {
     pub id: Uuid,
     pub protocol: ProtocolType,

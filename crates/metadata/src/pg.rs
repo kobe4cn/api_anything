@@ -86,6 +86,107 @@ impl MetadataRepo for PgMetadataRepo {
         Ok(())
     }
 
+    async fn create_contract(
+        &self,
+        project_id: Uuid,
+        version: &str,
+        original_schema: &str,
+        parsed_model: &serde_json::Value,
+    ) -> Result<Contract, AppError> {
+        // 运行时查询而非宏，规避 sqlx 编译期对自定义枚举类型注解的校验限制
+        let contract = sqlx::query_as::<_, Contract>(
+            r#"
+            INSERT INTO contracts (project_id, version, original_schema, parsed_model)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id, project_id, version,
+                      status as "status: ContractStatus",
+                      original_schema, parsed_model, created_at, updated_at
+            "#,
+        )
+        .bind(project_id)
+        .bind(version)
+        .bind(original_schema)
+        .bind(parsed_model)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(contract)
+    }
+
+    async fn create_backend_binding(
+        &self,
+        protocol: ProtocolType,
+        endpoint_config: &serde_json::Value,
+        timeout_ms: i64,
+    ) -> Result<BackendBinding, AppError> {
+        // 将枚举转为字符串并通过 ::protocol_type 显式类型转换，
+        // 避免 sqlx 运行时无法推断 $1 对应的自定义枚举类型
+        let protocol_str = match protocol {
+            ProtocolType::Soap => "soap",
+            ProtocolType::Http => "http",
+            ProtocolType::Cli => "cli",
+            ProtocolType::Ssh => "ssh",
+            ProtocolType::Pty => "pty",
+        };
+        let binding = sqlx::query_as::<_, BackendBinding>(
+            r#"
+            INSERT INTO backend_bindings (protocol, endpoint_config, timeout_ms)
+            VALUES ($1::protocol_type, $2, $3)
+            RETURNING id,
+                      protocol as "protocol: ProtocolType",
+                      endpoint_config, connection_pool_config, circuit_breaker_config,
+                      rate_limit_config, retry_config, timeout_ms, auth_mapping
+            "#,
+        )
+        .bind(protocol_str)
+        .bind(endpoint_config)
+        .bind(timeout_ms)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(binding)
+    }
+
+    async fn create_route(
+        &self,
+        contract_id: Uuid,
+        method: HttpMethod,
+        path: &str,
+        request_schema: &serde_json::Value,
+        response_schema: &serde_json::Value,
+        transform_rules: &serde_json::Value,
+        backend_binding_id: Uuid,
+    ) -> Result<Route, AppError> {
+        // 同上，枚举转字符串后通过 SQL 侧类型转换绑定，避免运行时类型推断失败
+        let method_str = match method {
+            HttpMethod::Get => "GET",
+            HttpMethod::Post => "POST",
+            HttpMethod::Put => "PUT",
+            HttpMethod::Patch => "PATCH",
+            HttpMethod::Delete => "DELETE",
+        };
+        let route = sqlx::query_as::<_, Route>(
+            r#"
+            INSERT INTO routes (contract_id, method, path, request_schema, response_schema, transform_rules, backend_binding_id)
+            VALUES ($1, $2::http_method, $3, $4, $5, $6, $7)
+            RETURNING id, contract_id,
+                      method as "method: HttpMethod",
+                      path, request_schema, response_schema, transform_rules,
+                      backend_binding_id,
+                      delivery_guarantee as "delivery_guarantee: DeliveryGuarantee",
+                      enabled, created_at, updated_at
+            "#,
+        )
+        .bind(contract_id)
+        .bind(method_str)
+        .bind(path)
+        .bind(request_schema)
+        .bind(response_schema)
+        .bind(transform_rules)
+        .bind(backend_binding_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(route)
+    }
+
     async fn list_active_routes_with_bindings(&self) -> Result<Vec<RouteWithBinding>, AppError> {
         // 使用运行时查询而非宏，避免编译时对 enum 联合类型注解的复杂依赖
         // JOIN 查询确保只返回已配置后端绑定的路由，孤立路由不会出现在路由表中
