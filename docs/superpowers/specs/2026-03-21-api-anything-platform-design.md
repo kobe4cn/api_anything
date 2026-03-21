@@ -100,7 +100,7 @@ Contract
 Route
 ├── id: UUID
 ├── contract_id: UUID → Contract
-├── method: Enum(GET, POST, PUT, DELETE)
+├── method: Enum(GET, POST, PUT, PATCH, DELETE)
 ├── path: String                   // e.g., /api/v1/orders/{id}
 ├── request_schema: JSONB          // JSON Schema
 ├── response_schema: JSONB         // JSON Schema
@@ -115,7 +115,6 @@ Route
 ```
 BackendBinding
 ├── id: UUID
-├── route_id: UUID → Route
 ├── protocol: Enum(SOAP, HTTP, CLI, SSH, PTY)
 ├── endpoint_config: EncryptedJSON // 连接地址/凭证等
 ├── connection_pool_config: JSONB  // 连接池/信号量配置
