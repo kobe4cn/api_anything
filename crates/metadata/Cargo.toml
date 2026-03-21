@@ -16,3 +16,4 @@ tracing.workspace = true
 
 [dev-dependencies]
 assert-json-diff.workspace = true
+dotenvy = "0.15"
