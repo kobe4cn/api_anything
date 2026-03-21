@@ -1,5 +1,6 @@
 use crate::wsdl::{parser::WsdlParser, mapper::WsdlMapper, llm_mapper::LlmEnhancedMapper};
 use crate::cli_help::{parser::CliHelpParser, mapper::CliMapper};
+use crate::ssh_sample::{parser::SshSampleParser, mapper::SshMapper};
 use crate::llm::client::LlmClient;
 use crate::openapi::OpenApiGenerator;
 use api_anything_common::models::*;
@@ -224,6 +225,86 @@ impl GenerationPipeline {
 
             let binding = repo.create_backend_binding(
                 ProtocolType::Soap,
+                &endpoint_config,
+                30000,
+            ).await?;
+
+            let method = match op.http_method.as_str() {
+                "GET" => HttpMethod::Get,
+                "PUT" => HttpMethod::Put,
+                "DELETE" => HttpMethod::Delete,
+                "PATCH" => HttpMethod::Patch,
+                _ => HttpMethod::Post,
+            };
+
+            let request_schema = op.input.as_ref()
+                .map(|m| m.schema.clone())
+                .unwrap_or(serde_json::json!({}));
+            let response_schema = op.output.as_ref()
+                .map(|m| m.schema.clone())
+                .unwrap_or(serde_json::json!({}));
+
+            repo.create_route(
+                db_contract.id,
+                method,
+                &op.path,
+                &request_schema,
+                &response_schema,
+                &endpoint_config,
+                binding.id,
+            ).await?;
+            routes_count += 1;
+        }
+
+        // Stage 5: 生成 OpenAPI 规范
+        tracing::info!("Stage 5: Generating OpenAPI spec");
+        let openapi = OpenApiGenerator::generate(&contract);
+
+        Ok(GenerationResult {
+            contract_id: db_contract.id,
+            routes_count,
+            openapi_spec: openapi,
+        })
+    }
+
+    /// SSH 样本管道：解析 SSH 交互样本文本，映射为统一合约，持久化后生成 OpenAPI 规范。
+    /// 流程结构与 run_wsdl / run_cli 保持一致，仅 Stage 1-2 使用 SSH 专属解析器和映射器。
+    pub async fn run_ssh(
+        repo: &impl MetadataRepo,
+        project_id: Uuid,
+        sample_text: &str,
+    ) -> Result<GenerationResult, anyhow::Error> {
+        // Stage 1: 解析 SSH 交互样本，提取 host、user 和命令列表
+        tracing::info!("Stage 1: Parsing SSH sample");
+        let ssh_def = SshSampleParser::parse(sample_text)?;
+
+        // Stage 2: 将 SSH 定义映射为统一合约，HTTP 方法由命令首词语义决定
+        tracing::info!("Stage 2: Mapping SSH sample to UnifiedContract");
+        let contract = SshMapper::map(&ssh_def)?;
+
+        // Stage 3: 持久化合约，原始样本文本保留以便后续审计
+        tracing::info!("Stage 3: Persisting to metadata");
+        let db_contract = repo.create_contract(
+            project_id,
+            "1.0.0",
+            sample_text,
+            &serde_json::to_value(&contract)?,
+        ).await?;
+
+        // Stage 4: 为每个 SSH 命令创建后端绑定和路由记录。
+        // endpoint_config 携带 SSH 连接参数（host、user、command_template、output_format），
+        // 供 SSH 适配器（Phase2b-T3）在调度时建立连接并执行命令
+        let mut routes_count = 0;
+        for (op, cmd) in contract.operations.iter().zip(ssh_def.commands.iter()) {
+            let endpoint_config = serde_json::json!({
+                "host": ssh_def.host,
+                "user": ssh_def.user,
+                "command_template": cmd.command_template,
+                "output_format": cmd.output_format,
+            });
+
+            let binding = repo.create_backend_binding(
+                ProtocolType::Ssh,
                 &endpoint_config,
                 30000,
             ).await?;
