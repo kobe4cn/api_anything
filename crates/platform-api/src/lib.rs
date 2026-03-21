@@ -2,7 +2,7 @@ pub mod middleware;
 pub mod routes;
 pub mod state;
 
-use axum::{routing::get, Router};
+use axum::{routing::{delete, get, post}, Router};
 use api_anything_metadata::PgMetadataRepo;
 use sqlx::PgPool;
 use state::AppState;
@@ -18,6 +18,8 @@ pub fn build_app(pool: PgPool) -> Router {
     Router::new()
         .route("/health", get(routes::health::health))
         .route("/health/ready", get(routes::health::ready))
+        .route("/api/v1/projects", post(routes::projects::create_project).get(routes::projects::list_projects))
+        .route("/api/v1/projects/{id}", get(routes::projects::get_project).delete(routes::projects::delete_project))
         .fallback(middleware::error_handler::fallback)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
