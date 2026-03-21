@@ -1,0 +1,14 @@
+report-gen 1.2.0
+Report generation tool
+
+USAGE:
+    report-gen <SUBCOMMAND>
+
+SUBCOMMANDS:
+    generate    Generate a new report
+    list        List existing reports
+    export      Export report to file
+
+OPTIONS:
+    -h, --help       Print help information
+    -V, --version    Print version

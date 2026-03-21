@@ -1,0 +1,13 @@
+report-gen generate
+Generate a new report
+
+USAGE:
+    report-gen generate [OPTIONS] --type <TYPE>
+
+OPTIONS:
+    -t, --type <TYPE>        Report type (daily, weekly, monthly)
+    -f, --format <FORMAT>    Output format [default: json] [possible values: json, csv, html]
+    -s, --start <DATE>       Start date (YYYY-MM-DD)
+    -e, --end <DATE>         End date (YYYY-MM-DD)
+    -o, --output <PATH>      Output file path
+    -h, --help               Print help information
