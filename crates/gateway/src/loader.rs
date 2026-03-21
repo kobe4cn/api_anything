@@ -1,5 +1,6 @@
 use crate::adapters::cli_process::{CliAdapter, CliConfig};
 use crate::adapters::soap::{SoapAdapter, SoapConfig};
+use crate::adapters::ssh_remote::SshAdapter;
 use crate::dispatcher::{BackendDispatcher, ProtectionStack};
 use crate::router::{DynamicRouter, RouteTable};
 use api_anything_common::error::AppError;
@@ -137,6 +138,21 @@ fn parse_output_format(
     OutputFormat::RawText
 }
 
+/// 从 endpoint_config JSON 构造 SshConfig；
+/// output_format 复用与 CLI 相同的 parse_output_format 逻辑，
+/// port 缺失时默认 22，identity_file 可选
+fn build_ssh_config(route: &RouteWithBinding) -> Result<crate::adapters::ssh_remote::SshConfig, anyhow::Error> {
+    let ec = &route.endpoint_config;
+    Ok(crate::adapters::ssh_remote::SshConfig {
+        host: ec["host"].as_str().unwrap_or("").to_string(),
+        port: ec["port"].as_u64().unwrap_or(22) as u16,
+        user: ec["user"].as_str().unwrap_or("").to_string(),
+        command_template: ec["command_template"].as_str().unwrap_or("").to_string(),
+        output_format: parse_output_format(ec.get("output_format")),
+        identity_file: ec["identity_file"].as_str().map(String::from),
+    })
+}
+
 /// 根据协议类型构造协议感知的保护栈；
 /// 不同协议的行为差异显著（CLI 进程比 SOAP HTTP 慢得多、并发度更低），
 /// 硬编码在 SOAP 时代的通用默认值会导致 CLI 路由的保护策略失当
@@ -222,6 +238,19 @@ impl RouteLoader {
                                 route_id = %route.route_id,
                                 error = %e,
                                 "Skipping CLI route: invalid endpoint_config"
+                            );
+                            continue;
+                        }
+                    }
+                }
+                ProtocolType::Ssh => {
+                    match build_ssh_config(route) {
+                        Ok(cfg) => Box::new(SshAdapter::new(cfg)),
+                        Err(e) => {
+                            tracing::warn!(
+                                route_id = %route.route_id,
+                                error = %e,
+                                "Skipping SSH route: invalid endpoint_config"
                             );
                             continue;
                         }
@@ -442,6 +471,53 @@ mod tests {
 
         assert_eq!(count, 0);
         assert!(!dispatchers.contains_key(&route_id));
+    }
+
+    fn make_ssh_route(route_id: Uuid, path: &str) -> RouteWithBinding {
+        RouteWithBinding {
+            route_id,
+            contract_id: Uuid::new_v4(),
+            method: HttpMethod::Get,
+            path: path.to_string(),
+            request_schema: serde_json::json!({}),
+            response_schema: serde_json::json!({}),
+            transform_rules: serde_json::json!({}),
+            delivery_guarantee: DeliveryGuarantee::AtMostOnce,
+            binding_id: Uuid::new_v4(),
+            protocol: ProtocolType::Ssh,
+            endpoint_config: serde_json::json!({
+                "host": "10.0.1.50",
+                "port": 22,
+                "user": "admin",
+                "command_template": "show interfaces status",
+                "output_format": "raw",
+            }),
+            connection_pool_config: serde_json::json!({}),
+            circuit_breaker_config: serde_json::json!({}),
+            rate_limit_config: serde_json::json!({}),
+            retry_config: serde_json::json!({}),
+            timeout_ms: 0,
+            auth_mapping: serde_json::json!({}),
+        }
+    }
+
+    #[tokio::test]
+    async fn loads_ssh_routes_and_registers_in_router() {
+        // SSH 路由应使用 SSH 协议特定默认值（并发 5、超时 120s）构建保护栈
+        let route_id = Uuid::new_v4();
+        let repo = MockRepo {
+            routes: vec![make_ssh_route(route_id, "/network/interfaces")],
+        };
+        let router = DynamicRouter::new();
+        let dispatchers: DashMap<Uuid, Arc<BackendDispatcher>> = DashMap::new();
+
+        let count = RouteLoader::load(&repo, &router, &dispatchers).await.unwrap();
+
+        assert_eq!(count, 1);
+        assert!(dispatchers.contains_key(&route_id));
+        let result = router.match_route(&Method::GET, "/network/interfaces");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().0, route_id);
     }
 
     #[tokio::test]

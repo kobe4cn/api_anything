@@ -25,6 +25,17 @@ enum Commands {
         project: String,
     },
 
+    /// Generate REST API from SSH interaction sample
+    GenerateSsh {
+        /// Path to SSH interaction sample file
+        #[arg(long)]
+        sample: String,
+
+        /// Project name
+        #[arg(short, long)]
+        project: String,
+    },
+
     /// Generate REST API from CLI tool help output
     GenerateCli {
         /// Path to main help output text file
@@ -77,6 +88,34 @@ async fn main() -> anyhow::Result<()> {
 
             // 将 OpenAPI 规范写入 <source>.openapi.json，方便直接导入 Postman 或 Swagger UI
             let spec_path = format!("{}.openapi.json", source);
+            std::fs::write(&spec_path, serde_json::to_string_pretty(&result.openapi_spec)?)?;
+            println!("  OpenAPI spec: {}", spec_path);
+        }
+
+        Commands::GenerateSsh { sample, project } => {
+            let config = AppConfig::from_env();
+            let pool = PgPool::connect(&config.database_url).await?;
+            let repo = PgMetadataRepo::new(pool);
+            // 允许 CLI 在空库上作为独立入口运行，迁移幂等，多次执行无副作用
+            repo.run_migrations().await?;
+
+            let sample_text = std::fs::read_to_string(&sample)
+                .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", sample, e))?;
+
+            // 创建项目记录，source_type 为 Ssh 以区别于 WSDL/CLI 来源
+            let project_obj = repo.create_project(
+                &project, "SSH command wrapper", "cli", SourceType::Ssh,
+            ).await?;
+
+            // 执行 SSH 生成流水线：解析样本 → 映射合约 → 持久化 → 生成 OpenAPI
+            let result = GenerationPipeline::run_ssh(&repo, project_obj.id, &sample_text).await?;
+
+            println!("SSH Generation complete!");
+            println!("  Contract ID: {}", result.contract_id);
+            println!("  Routes created: {}", result.routes_count);
+
+            // 将 OpenAPI 规范写入 <sample>.openapi.json，与其他子命令保持一致
+            let spec_path = format!("{}.openapi.json", sample);
             std::fs::write(&spec_path, serde_json::to_string_pretty(&result.openapi_spec)?)?;
             println!("  OpenAPI spec: {}", spec_path);
         }
