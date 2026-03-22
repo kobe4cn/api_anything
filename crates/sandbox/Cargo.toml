@@ -1,0 +1,20 @@
+[package]
+name = "api-anything-sandbox"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+api-anything-common = { path = "../common" }
+api-anything-metadata = { path = "../metadata" }
+api-anything-gateway = { path = "../gateway" }
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+rand.workspace = true
+axum.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

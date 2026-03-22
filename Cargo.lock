@@ -192,9 +192,11 @@ dependencies = [
  "api-anything-gateway",
  "api-anything-generator",
  "api-anything-metadata",
+ "api-anything-sandbox",
  "assert-json-diff",
  "axum 0.8.8",
  "axum-test",
+ "chrono",
  "dashmap",
  "dotenvy",
  "opentelemetry",
@@ -211,6 +213,24 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "wiremock",
+]
+
+[[package]]
+name = "api-anything-sandbox"
+version = "0.1.0"
+dependencies = [
+ "api-anything-common",
+ "api-anything-gateway",
+ "api-anything-metadata",
+ "axum 0.8.8",
+ "chrono",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

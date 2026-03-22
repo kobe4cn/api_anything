@@ -1,6 +1,8 @@
 use crate::repo::MetadataRepo;
 use api_anything_common::error::AppError;
 use api_anything_common::models::*;
+use chrono::{DateTime, Utc};
+use serde_json::Value;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -181,6 +183,76 @@ impl MetadataRepo for PgMetadataRepo {
         .fetch_one(&self.pool)
         .await?;
         Ok(route)
+    }
+
+    async fn create_sandbox_session(
+        &self,
+        project_id: Uuid,
+        tenant_id: &str,
+        mode: SandboxMode,
+        config: &Value,
+        expires_at: DateTime<Utc>,
+    ) -> Result<SandboxSession, AppError> {
+        // 枚举转字符串后通过 SQL 侧 ::sandbox_mode 类型转换绑定，与 protocol_type 处理方式一致
+        let mode_str = match mode {
+            SandboxMode::Mock => "mock",
+            SandboxMode::Replay => "replay",
+            SandboxMode::Proxy => "proxy",
+        };
+        let session = sqlx::query_as::<_, SandboxSession>(
+            r#"
+            INSERT INTO sandbox_sessions (project_id, tenant_id, mode, config, expires_at)
+            VALUES ($1, $2, $3::sandbox_mode, $4, $5)
+            RETURNING id, project_id, tenant_id, mode, config, expires_at, created_at
+            "#,
+        )
+        .bind(project_id)
+        .bind(tenant_id)
+        .bind(mode_str)
+        .bind(config)
+        .bind(expires_at)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(session)
+    }
+
+    async fn get_sandbox_session(&self, id: Uuid) -> Result<SandboxSession, AppError> {
+        let session = sqlx::query_as::<_, SandboxSession>(
+            r#"
+            SELECT id, project_id, tenant_id, mode, config, expires_at, created_at
+            FROM sandbox_sessions WHERE id = $1
+            "#,
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("SandboxSession {id} not found")))?;
+        Ok(session)
+    }
+
+    async fn list_sandbox_sessions(&self, project_id: Uuid) -> Result<Vec<SandboxSession>, AppError> {
+        // 按 created_at 降序排列，最新会话优先展示；过期会话由后台任务清理而非此处过滤
+        let sessions = sqlx::query_as::<_, SandboxSession>(
+            r#"
+            SELECT id, project_id, tenant_id, mode, config, expires_at, created_at
+            FROM sandbox_sessions WHERE project_id = $1
+            ORDER BY created_at DESC
+            "#,
+        )
+        .bind(project_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(sessions)
+    }
+
+    async fn delete_sandbox_session(&self, id: Uuid) -> Result<(), AppError> {
+        let result = sqlx::query!("DELETE FROM sandbox_sessions WHERE id = $1", id)
+            .execute(&self.pool)
+            .await?;
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound(format!("SandboxSession {id} not found")));
+        }
+        Ok(())
     }
 
     async fn list_active_routes_with_bindings(&self) -> Result<Vec<RouteWithBinding>, AppError> {

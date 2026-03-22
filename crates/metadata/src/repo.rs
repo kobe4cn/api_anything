@@ -1,5 +1,7 @@
 use api_anything_common::error::AppError;
 use api_anything_common::models::*;
+use chrono::{DateTime, Utc};
+use serde_json::Value;
 use uuid::Uuid;
 
 /// 所有子系统通过此 trait 访问元数据，隔离存储实现细节，便于测试时替换为内存实现
@@ -39,4 +41,21 @@ pub trait MetadataRepo: Send + Sync {
         transform_rules: &serde_json::Value,
         backend_binding_id: Uuid,
     ) -> Result<Route, AppError>;
+
+    /// 创建沙箱会话；expires_at 由调用方计算，使业务层控制过期策略而非数据库层
+    async fn create_sandbox_session(
+        &self,
+        project_id: Uuid,
+        tenant_id: &str,
+        mode: SandboxMode,
+        config: &Value,
+        expires_at: DateTime<Utc>,
+    ) -> Result<SandboxSession, AppError>;
+
+    async fn get_sandbox_session(&self, id: Uuid) -> Result<SandboxSession, AppError>;
+
+    /// 按 project_id 过滤，仅返回属于该项目的会话，防止跨项目数据泄露
+    async fn list_sandbox_sessions(&self, project_id: Uuid) -> Result<Vec<SandboxSession>, AppError>;
+
+    async fn delete_sandbox_session(&self, id: Uuid) -> Result<(), AppError>;
 }

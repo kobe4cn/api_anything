@@ -349,6 +349,27 @@ mod tests {
         ) -> Result<Route, AppError> {
             unimplemented!()
         }
+
+        // MockRepo 仅用于网关路由加载的单元测试，沙箱会话方法不在测试范围内
+        async fn create_sandbox_session(
+            &self,
+            _project_id: Uuid,
+            _tenant_id: &str,
+            _mode: SandboxMode,
+            _config: &serde_json::Value,
+            _expires_at: chrono::DateTime<chrono::Utc>,
+        ) -> Result<SandboxSession, AppError> {
+            unimplemented!()
+        }
+        async fn get_sandbox_session(&self, _id: Uuid) -> Result<SandboxSession, AppError> {
+            unimplemented!()
+        }
+        async fn list_sandbox_sessions(&self, _project_id: Uuid) -> Result<Vec<SandboxSession>, AppError> {
+            unimplemented!()
+        }
+        async fn delete_sandbox_session(&self, _id: Uuid) -> Result<(), AppError> {
+            unimplemented!()
+        }
     }
 
     fn make_soap_route(route_id: Uuid, path: &str) -> RouteWithBinding {

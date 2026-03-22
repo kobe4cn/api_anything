@@ -21,6 +21,16 @@ pub fn build_app(state: AppState) -> Router {
             "/api/v1/projects/{id}",
             get(routes::projects::get_project).delete(routes::projects::delete_project),
         )
+        // 沙箱会话路由：创建和列表挂在 project 下，删除单独挂顶层以便通过 session id 直接操作
+        .route(
+            "/api/v1/projects/{project_id}/sandbox-sessions",
+            post(routes::sandbox_sessions::create_sandbox_session)
+                .get(routes::sandbox_sessions::list_sandbox_sessions),
+        )
+        .route(
+            "/api/v1/sandbox-sessions/{id}",
+            delete(routes::sandbox_sessions::delete_sandbox_session),
+        )
         // 通配路由捕获所有 /gw/ 前缀请求，交由动态路由器分发
         .route("/gw/{*rest}", any(routes::gateway::gateway_handler))
         .fallback(middleware::error_handler::fallback)

@@ -192,7 +192,7 @@ pub struct DeliveryRecord {
 }
 
 // expires_at 用于自动清理过期沙箱会话，防止测试资源无限占用
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct SandboxSession {
     pub id: Uuid,
     pub project_id: Uuid,

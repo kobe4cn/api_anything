@@ -7,6 +7,7 @@ members = [
     "crates/cli",
     "crates/gateway",
     "crates/generator",
+    "crates/sandbox",
 ]
 
 [workspace.package]
@@ -62,3 +63,6 @@ quick-xml = { version = "0.37", features = ["serialize"] }
 
 # Regex
 regex = "1"
+
+# Random number generation
+rand = "0.8"
