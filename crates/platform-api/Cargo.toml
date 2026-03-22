@@ -39,3 +39,4 @@ wiremock = "0.6"
 # 两者均已存在于工作区 workspace，此处仅声明路径引用
 api-anything-generator = { path = "../generator" }
 api-anything-gateway = { path = "../gateway" }
+api-anything-event-bus = { path = "../event-bus" }

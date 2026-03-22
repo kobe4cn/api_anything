@@ -266,6 +266,7 @@ dependencies = [
  "anyhow",
  "api-anything-common",
  "api-anything-compensation",
+ "api-anything-event-bus",
  "api-anything-gateway",
  "api-anything-generator",
  "api-anything-metadata",

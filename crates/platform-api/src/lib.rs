@@ -67,6 +67,9 @@ pub fn build_app(state: AppState) -> Router {
             "/api/v1/webhooks/{id}",
             delete(routes::webhooks::delete_webhook),
         )
+        // 插件管理：列出已加载插件和扫描新插件（PluginManager 集成前返回占位响应）
+        .route("/api/v1/plugins", get(routes::plugins::list_plugins))
+        .route("/api/v1/plugins/scan", post(routes::plugins::scan_plugins))
         // 文档类端点：OpenAPI JSON 规范、Swagger UI、Agent 提示词
         .route("/api/v1/docs", get(routes::docs::swagger_ui))
         .route("/api/v1/docs/openapi.json", get(routes::docs::openapi_json))
