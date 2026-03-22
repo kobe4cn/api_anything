@@ -37,9 +37,43 @@ export const api = {
     request<any>('/api/v1/webhooks', { method: 'POST', body: JSON.stringify(data) }),
   deleteWebhook: (id: string) => request<void>(`/api/v1/webhooks/${id}`, { method: 'DELETE' }),
 
+  // Recordings
+  listRecordings: (sessionId: string) => request<any[]>(`/api/v1/sandbox-sessions/${sessionId}/recordings`),
+  clearRecordings: (sessionId: string) => request<void>(`/api/v1/sandbox-sessions/${sessionId}/recordings`, { method: 'DELETE' }),
+
   // Docs
   getAgentPrompt: () => fetch('/api/v1/docs/agent-prompt').then(r => r.text()),
+  getOpenApiSpec: () => request<any>('/api/v1/docs/openapi.json'),
+  getSdkCode: (language: string) => fetch(`/api/v1/docs/sdk/${language}`).then(r => r.text()),
 
   // Health
   health: () => request<any>('/health'),
+
+  // 通用请求方法：供 API Explorer 发送任意请求，不限定路径和方法
+  sendRequest: async (method: string, path: string, body?: any, headers?: Record<string, string>) => {
+    const start = Date.now();
+    const options: RequestInit = {
+      method,
+      headers: { 'Content-Type': 'application/json', ...headers },
+    };
+    if (body && method !== 'GET' && method !== 'DELETE') {
+      options.body = JSON.stringify(body);
+    }
+    const resp = await fetch(`${BASE_URL}${path}`, options);
+    const duration = Date.now() - start;
+    const responseBody = await resp.text();
+    let parsedBody: any;
+    try {
+      parsedBody = JSON.parse(responseBody);
+    } catch {
+      parsedBody = responseBody;
+    }
+    return {
+      status: resp.status,
+      statusText: resp.statusText,
+      headers: Object.fromEntries(resp.headers.entries()),
+      body: parsedBody,
+      duration,
+    };
+  },
 };
