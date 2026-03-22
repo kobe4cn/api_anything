@@ -8,8 +8,8 @@ async fn list_webhooks_returns_empty_array() {
     let resp = server.get("/api/v1/webhooks").await;
     resp.assert_status_ok();
     let body: Vec<serde_json::Value> = resp.json();
-    // 初始状态可能已有其他测试创建的订阅，仅验证返回的是数组
-    assert!(body.is_array() || true);
+    // Vec 反序列化成功即证明返回的是 JSON 数组
+    let _ = body.len();
 }
 
 #[tokio::test]

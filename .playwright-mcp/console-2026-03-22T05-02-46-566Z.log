@@ -1,0 +1,2 @@
+[      62ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5173/api/v1/docs:0
+[   29904ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5173/api/v1/docs/agent-prompt:0
