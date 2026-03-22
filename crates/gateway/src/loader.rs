@@ -447,6 +447,12 @@ mod tests {
         ) -> Result<Vec<RecordedInteraction>, AppError> {
             unimplemented!()
         }
+        async fn delete_recorded_interactions(
+            &self,
+            _session_id: Uuid,
+        ) -> Result<u64, AppError> {
+            unimplemented!()
+        }
 
         // MockRepo 仅用于网关路由加载测试，补偿系统方法不在测试范围内
         async fn create_delivery_record(

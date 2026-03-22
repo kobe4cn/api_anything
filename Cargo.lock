@@ -269,6 +269,7 @@ dependencies = [
  "api-anything-gateway",
  "api-anything-generator",
  "api-anything-metadata",
+ "api-anything-plugin-sdk",
  "api-anything-sandbox",
  "assert-json-diff",
  "axum 0.8.8",
