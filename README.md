@@ -4,10 +4,10 @@
 
 ![Rust](https://img.shields.io/badge/Rust-1.82+-orange?logo=rust)
 ![License](https://img.shields.io/badge/License-MIT-blue)
-![Tests](https://img.shields.io/badge/Tests-243%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-307%20passed-brightgreen)
 ![Crates](https://img.shields.io/badge/Crates-10-purple)
 
-> **10** Rust Crates | **8** Web 页面 | **243** 自动化测试 | **4** 协议适配器 | **16** 前端截图
+> **10** Rust Crates | **8** Web 页面 | **307** 自动化测试 | **4** 协议适配器 | **16** 前端截图
 
 ---
 
@@ -519,7 +519,7 @@ cargo run -p api-anything-cli -- generate-cli \
 
 | 指标 | 数值 |
 |------|------|
-| 自动化测试总数 | **243** |
+| 自动化测试总数 | **307** |
 | 测试通过率 | **100%** |
 | 覆盖模块 | 8 个 crate |
 | 前端截图 | 16 张 |
