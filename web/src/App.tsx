@@ -4,6 +4,7 @@ import { Dashboard } from './pages/Dashboard';
 import { ApiDocs } from './pages/ApiDocs';
 import { SandboxManager } from './pages/SandboxManager';
 import { CompensationManager } from './pages/CompensationManager';
+import { WebhookManager } from './pages/WebhookManager';
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
           <Route path="/docs" element={<ApiDocs />} />
           <Route path="/sandbox" element={<SandboxManager />} />
           <Route path="/compensation" element={<CompensationManager />} />
+          <Route path="/webhooks" element={<WebhookManager />} />
         </Route>
       </Routes>
     </BrowserRouter>

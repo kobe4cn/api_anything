@@ -5,6 +5,7 @@ const navItems = [
   { path: '/docs', label: 'API Docs', icon: '📖' },
   { path: '/sandbox', label: 'Sandbox', icon: '🧪' },
   { path: '/compensation', label: 'Compensation', icon: '🔄' },
+  { path: '/webhooks', label: 'Webhooks', icon: '🔔' },
 ];
 
 export function Layout() {

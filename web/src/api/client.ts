@@ -31,6 +31,12 @@ export const api = {
   resolveDeadLetter: (id: string) => request<void>(`/api/v1/compensation/dead-letters/${id}/resolve`, { method: 'POST' }),
   batchRetry: (ids: string[]) => request<any>('/api/v1/compensation/dead-letters/batch-retry', { method: 'POST', body: JSON.stringify({ ids }) }),
 
+  // Webhooks
+  listWebhooks: () => request<any[]>('/api/v1/webhooks'),
+  createWebhook: (data: { url: string; event_types: string[]; description: string }) =>
+    request<any>('/api/v1/webhooks', { method: 'POST', body: JSON.stringify(data) }),
+  deleteWebhook: (id: string) => request<void>(`/api/v1/webhooks/${id}`, { method: 'DELETE' }),
+
   // Docs
   getAgentPrompt: () => fetch('/api/v1/docs/agent-prompt').then(r => r.text()),
 

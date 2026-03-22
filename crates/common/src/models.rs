@@ -249,6 +249,21 @@ pub struct RouteWithBinding {
     pub auth_mapping: serde_json::Value,
 }
 
+/// Webhook 订阅记录，支持按事件类型过滤推送目标；
+/// headers 存储自定义请求头（如认证 token），避免明文出现在 URL 中
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct WebhookSubscription {
+    pub id: Uuid,
+    pub url: String,
+    pub event_types: Value,
+    pub filter: Value,
+    pub headers: Value,
+    pub active: bool,
+    pub description: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

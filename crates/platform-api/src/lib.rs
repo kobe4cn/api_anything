@@ -52,6 +52,15 @@ pub fn build_app(state: AppState) -> Router {
             "/api/v1/compensation/delivery-records/{id}",
             get(routes::compensation::get_delivery_record),
         )
+        // Webhook 订阅管理：创建、列表、删除
+        .route(
+            "/api/v1/webhooks",
+            post(routes::webhooks::create_webhook).get(routes::webhooks::list_webhooks),
+        )
+        .route(
+            "/api/v1/webhooks/{id}",
+            delete(routes::webhooks::delete_webhook),
+        )
         // 文档类端点：OpenAPI JSON 规范、Swagger UI、Agent 提示词
         .route("/api/v1/docs", get(routes::docs::swagger_ui))
         .route("/api/v1/docs/openapi.json", get(routes::docs::openapi_json))

@@ -139,4 +139,28 @@ pub trait MetadataRepo: Send + Sync {
         key: &str,
         response_hash: &str,
     ) -> Result<(), AppError>;
+
+    // ── Webhook 订阅管理 ─────────────────────────────────────────────────
+
+    /// 创建 Webhook 订阅；event_types 为 JSON 数组，指定订阅的事件类型列表
+    async fn create_webhook_subscription(
+        &self,
+        url: &str,
+        event_types: &Value,
+        description: &str,
+    ) -> Result<WebhookSubscription, AppError>;
+
+    /// 列出全部 Webhook 订阅，包含已禁用的，供管理界面展示
+    async fn list_webhook_subscriptions(&self) -> Result<Vec<WebhookSubscription>, AppError>;
+
+    /// 按 id 删除 Webhook 订阅；不存在时返回 404
+    async fn delete_webhook_subscription(&self, id: Uuid) -> Result<(), AppError>;
+
+    /// 查询匹配特定事件类型的活跃订阅；
+    /// 使用 JSONB @> 运算符检查 event_types 数组是否包含目标事件，
+    /// 同时匹配 event_types 为空数组的订阅（表示订阅所有事件）
+    async fn list_active_subscriptions_for_event(
+        &self,
+        event_type: &str,
+    ) -> Result<Vec<WebhookSubscription>, AppError>;
 }

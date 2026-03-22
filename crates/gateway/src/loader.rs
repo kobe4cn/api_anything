@@ -507,6 +507,30 @@ mod tests {
         ) -> Result<(), AppError> {
             unimplemented!()
         }
+
+        // MockRepo 仅用于网关路由加载测试，Webhook 订阅方法不在测试范围内
+        async fn create_webhook_subscription(
+            &self,
+            _url: &str,
+            _event_types: &serde_json::Value,
+            _description: &str,
+        ) -> Result<api_anything_common::models::WebhookSubscription, AppError> {
+            unimplemented!()
+        }
+        async fn list_webhook_subscriptions(
+            &self,
+        ) -> Result<Vec<api_anything_common::models::WebhookSubscription>, AppError> {
+            unimplemented!()
+        }
+        async fn delete_webhook_subscription(&self, _id: Uuid) -> Result<(), AppError> {
+            unimplemented!()
+        }
+        async fn list_active_subscriptions_for_event(
+            &self,
+            _event_type: &str,
+        ) -> Result<Vec<api_anything_common::models::WebhookSubscription>, AppError> {
+            unimplemented!()
+        }
     }
 
     fn make_soap_route(route_id: Uuid, path: &str) -> RouteWithBinding {

@@ -552,6 +552,70 @@ impl MetadataRepo for PgMetadataRepo {
         Ok(())
     }
 
+    async fn create_webhook_subscription(
+        &self,
+        url: &str,
+        event_types: &Value,
+        description: &str,
+    ) -> Result<WebhookSubscription, AppError> {
+        let sub = sqlx::query_as::<_, WebhookSubscription>(
+            r#"
+            INSERT INTO webhook_subscriptions (url, event_types, description)
+            VALUES ($1, $2, $3)
+            RETURNING id, url, event_types, filter, headers, active, description, created_at, updated_at
+            "#,
+        )
+        .bind(url)
+        .bind(event_types)
+        .bind(description)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(sub)
+    }
+
+    async fn list_webhook_subscriptions(&self) -> Result<Vec<WebhookSubscription>, AppError> {
+        let subs = sqlx::query_as::<_, WebhookSubscription>(
+            r#"
+            SELECT id, url, event_types, filter, headers, active, description, created_at, updated_at
+            FROM webhook_subscriptions
+            ORDER BY created_at DESC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(subs)
+    }
+
+    async fn delete_webhook_subscription(&self, id: Uuid) -> Result<(), AppError> {
+        let result = sqlx::query("DELETE FROM webhook_subscriptions WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        if result.rows_affected() == 0 {
+            return Err(AppError::NotFound(format!("WebhookSubscription {id} not found")));
+        }
+        Ok(())
+    }
+
+    async fn list_active_subscriptions_for_event(
+        &self,
+        event_type: &str,
+    ) -> Result<Vec<WebhookSubscription>, AppError> {
+        // 匹配两种情况：event_types 包含目标事件类型，或 event_types 为空数组（订阅全部事件）
+        let subs = sqlx::query_as::<_, WebhookSubscription>(
+            r#"
+            SELECT id, url, event_types, filter, headers, active, description, created_at, updated_at
+            FROM webhook_subscriptions
+            WHERE active = true
+              AND (event_types @> $1::jsonb OR event_types = '[]'::jsonb)
+            "#,
+        )
+        .bind(serde_json::json!([event_type]))
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(subs)
+    }
+
     async fn get_route(&self, id: Uuid) -> Result<Route, AppError> {
         // fetch_optional 区分"未找到"与数据库错误，明确返回 404 而非 500
         let route = sqlx::query_as::<_, Route>(
