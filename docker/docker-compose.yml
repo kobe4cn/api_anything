@@ -92,6 +92,17 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - grafana_data:/var/lib/grafana
 
+  # Web 前端：独立 nginx 容器，适用于需要前后端分离部署的生产环境；
+  # 开发时也可直接由 platform-api 的 fallback_service 托管静态文件
+  web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+    ports:
+      - "3001:80"
+    depends_on:
+      - postgres
+
 volumes:
   pg_data:
   tempo_data:

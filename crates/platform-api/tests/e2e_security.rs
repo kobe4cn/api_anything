@@ -110,14 +110,15 @@ async fn security_cli_injection_newline() {
 #[cfg(unix)]
 #[tokio::test]
 async fn security_cli_injection_null_byte() {
-    // null byte 可能导致 C 字符串提前截断，绕过后续校验
+    // null byte 会导致 OS 拒绝执行命令（"nul byte found in provided data"）
+    // 这是正确的安全行为 — OS 级别的防御阻止了潜在的截断攻击
     let adapter = echo_adapter();
     let req = make_request(json!({"message": "test\x00injected"}));
     let backend_req = adapter.transform_request(&req).unwrap();
-    let backend_resp = adapter.execute(&backend_req).await.unwrap();
+    let result = adapter.execute(&backend_req).await;
     assert!(
-        backend_resp.is_success,
-        "echo should not crash on null byte in argument"
+        result.is_err(),
+        "OS should reject command with null byte in arguments"
     );
 }
 

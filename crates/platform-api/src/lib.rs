@@ -5,6 +5,7 @@ pub mod state;
 use axum::routing::{any, delete, get, post};
 use axum::Router;
 use state::AppState;
+use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 // build_app 接受已初始化的 AppState，使 main.rs 可在启动前先执行路由加载，
 // 测试代码也可以传入预填充的 state 来验证特定场景
@@ -59,7 +60,12 @@ pub fn build_app(state: AppState) -> Router {
         .route("/gw/{*rest}", any(routes::gateway::gateway_handler))
         // 沙箱通配路由：与网关共享路由表，但根据 X-Sandbox-Mode 头走 mock/replay/proxy 分支
         .route("/sandbox/{*rest}", any(routes::sandbox::sandbox_handler))
-        .fallback(middleware::error_handler::fallback)
+        // 静态文件兜底：优先尝试从 web/dist 提供静态资源（JS/CSS/图片等），
+        // 未匹配的路径回退到 index.html 以支持 SPA 客户端路由（React Router）
+        .fallback_service(
+            ServeDir::new("web/dist")
+                .not_found_service(ServeFile::new("web/dist/index.html")),
+        )
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
