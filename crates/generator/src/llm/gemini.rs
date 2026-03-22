@@ -22,7 +22,7 @@ impl GeminiClient {
                 "https://generativelanguage.googleapis.com/v1beta".to_string()
             }),
             client: reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(300))
+                .timeout(std::time::Duration::from_secs(600))
                 .build()
                 .unwrap_or_else(|_| reqwest::Client::new()),
         }

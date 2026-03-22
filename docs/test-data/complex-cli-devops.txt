@@ -1,0 +1,181 @@
+deployctl 2.1.0
+DevOps deployment and operations management toolkit
+
+USAGE:
+    deployctl [OPTIONS] <SUBCOMMAND>
+
+SUBCOMMANDS:
+    deploy        Deploy application to target environment
+    rollback      Rollback to a previous deployment revision
+    status        Show deployment status and health
+    logs          Stream or query deployment logs
+    scale         Scale application replicas up or down
+    config        Manage environment configuration (get/set/list)
+    secrets       Manage encrypted secrets (get/set/delete/rotate)
+    health-check  Run health checks against deployed services
+
+OPTIONS:
+    -e, --env <ENV>              Target environment [env: DEPLOYCTL_ENV] [default: staging]
+                                 [possible values: dev, staging, production]
+    -n, --namespace <NS>         Kubernetes namespace [env: DEPLOYCTL_NAMESPACE] [default: default]
+    -c, --context <CONTEXT>      Kubeconfig context [env: KUBECONFIG_CONTEXT]
+        --timeout <SECONDS>      Command timeout in seconds [default: 300]
+        --dry-run                Print actions without executing
+        --output <FORMAT>        Output format [default: text] [possible values: text, json, yaml]
+    -v, --verbose                Enable verbose logging
+    -q, --quiet                  Suppress informational output
+        --no-color               Disable colored output
+    -h, --help                   Print help information
+    -V, --version                Print version
+
+DEPLOY SUBCOMMAND:
+    deployctl deploy [OPTIONS] <APP>
+
+    ARGS:
+        <APP>    Application name to deploy
+
+    OPTIONS:
+        --image <IMAGE>          Container image (e.g. registry.example.com/myapp:v1.2.3)
+        --tag <TAG>              Image tag to deploy [default: latest]
+        --replicas <COUNT>       Number of replicas [default: current count]
+        --strategy <STRATEGY>    Deploy strategy [default: rolling]
+                                 [possible values: rolling, blue-green, canary, recreate]
+        --canary-weight <PCT>    Traffic percentage for canary (1-100) [default: 10]
+        --wait                   Wait for rollout to complete
+        --timeout <SECONDS>      Rollout wait timeout [default: 600]
+        --set <KEY=VALUE>...     Override helm values (repeatable)
+        --values <FILE>          Additional values file path
+    [env: REGISTRY_PASSWORD]     Registry password (set as env var for security)
+
+ROLLBACK SUBCOMMAND:
+    deployctl rollback [OPTIONS] <APP>
+
+    ARGS:
+        <APP>    Application name to rollback
+
+    OPTIONS:
+        --revision <REV>         Target revision number (default: previous)
+        --reason <TEXT>          Rollback reason for audit log
+        --wait                   Wait for rollback to complete
+
+STATUS SUBCOMMAND:
+    deployctl status [OPTIONS] [APP]
+
+    ARGS:
+        [APP]    Application name (omit for all apps)
+
+    OPTIONS:
+        --watch                  Continuously watch status changes
+        --interval <SECONDS>     Watch refresh interval [default: 5]
+        --show-pods              Include individual pod status
+        --show-events            Include recent Kubernetes events
+
+LOGS SUBCOMMAND:
+    deployctl logs [OPTIONS] <APP>
+
+    ARGS:
+        <APP>    Application name
+
+    OPTIONS:
+        -f, --follow             Follow log output in real time
+        --since <DURATION>       Show logs from last duration (e.g. 1h, 30m, 2d) [default: 1h]
+        --until <TIMESTAMP>      Show logs up to this time (RFC3339 format)
+        --tail <LINES>           Number of recent lines to show [default: 100]
+        --container <NAME>       Container name (for multi-container pods)
+        --grep <PATTERN>         Filter lines matching regex pattern
+        --level <LEVEL>          Minimum log level [possible values: debug, info, warn, error]
+    [env: LOG_STORAGE_ENDPOINT]  External log storage endpoint
+
+SCALE SUBCOMMAND:
+    deployctl scale [OPTIONS] <APP>
+
+    ARGS:
+        <APP>    Application name
+
+    OPTIONS:
+        --replicas <COUNT>       Target replica count (required)
+        --min <COUNT>            Minimum replicas for autoscaling
+        --max <COUNT>            Maximum replicas for autoscaling
+        --cpu-target <PCT>       CPU utilization target for HPA [default: 70]
+        --wait                   Wait for scaling to complete
+
+CONFIG SUBCOMMAND:
+    deployctl config <OPERATION> [OPTIONS]
+
+    OPERATIONS:
+        get <KEY>                Get a configuration value
+        set <KEY> <VALUE>        Set a configuration value
+        list                     List all configuration keys and values
+
+    OPTIONS (get):
+        --decrypt                Decrypt and show encrypted values
+        --output <FORMAT>        Output format [possible values: text, json, yaml]
+
+    OPTIONS (set):
+        --encrypt                Encrypt value before storing
+        --description <TEXT>     Human-readable description for the key
+        --overwrite              Overwrite existing value without confirmation
+
+    OPTIONS (list):
+        --prefix <PREFIX>        Filter keys by prefix
+        --show-values            Show values (hidden by default)
+        --output <FORMAT>        Output format [possible values: text, json, yaml, dotenv]
+    [env: CONFIG_ENCRYPTION_KEY] Encryption key for config secrets
+
+SECRETS SUBCOMMAND:
+    deployctl secrets <OPERATION> [OPTIONS]
+
+    OPERATIONS:
+        get <SECRET_NAME>        Retrieve a secret value
+        set <SECRET_NAME>        Set secret (reads value from stdin or --value)
+        delete <SECRET_NAME>     Delete a secret
+        rotate <SECRET_NAME>     Rotate secret to a new value
+
+    OPTIONS (set):
+        --value <VALUE>          Secret value (prefer stdin for security)
+        --from-file <FILE>       Read secret value from file
+        --ttl <SECONDS>          Secret TTL (auto-expire after duration)
+        --tags <KEY=VALUE>...    Metadata tags (repeatable)
+    [env: VAULT_TOKEN]           HashiCorp Vault authentication token
+    [env: VAULT_ADDR]            HashiCorp Vault server address
+
+HEALTH-CHECK SUBCOMMAND:
+    deployctl health-check [OPTIONS] <APP>
+
+    ARGS:
+        <APP>    Application name
+
+    OPTIONS:
+        --endpoint <URL>         Override health check endpoint URL
+        --expected-status <CODE> Expected HTTP status code [default: 200]
+        --retries <COUNT>        Number of retry attempts [default: 3]
+        --retry-delay <SECONDS>  Delay between retries [default: 5]
+        --all-pods               Check health of every individual pod
+        --include-deps           Also check declared service dependencies
+
+ENVIRONMENT VARIABLES:
+    DEPLOYCTL_ENV                Default target environment
+    DEPLOYCTL_NAMESPACE          Default Kubernetes namespace
+    KUBECONFIG_CONTEXT           Default kubeconfig context
+    DEPLOYCTL_TOKEN              API authentication token
+    REGISTRY_PASSWORD            Container registry password
+    LOG_STORAGE_ENDPOINT         External log storage URL
+    CONFIG_ENCRYPTION_KEY        AES-256 key for config encryption
+    VAULT_TOKEN                  HashiCorp Vault token
+    VAULT_ADDR                   HashiCorp Vault server address
+
+EXAMPLES:
+    # Deploy to production with canary strategy
+    deployctl deploy myapp --env production --image registry/myapp:v2.0.0 --strategy canary --canary-weight 20 --wait
+
+    # Stream live logs filtered by error level
+    deployctl logs myapp --env production --follow --level error --grep "timeout"
+
+    # Scale to 10 replicas and wait
+    deployctl scale myapp --replicas 10 --wait
+
+    # Set an encrypted config value
+    deployctl config set DATABASE_URL "postgres://..." --encrypt
+
+    # Check health of all pods including dependencies
+    deployctl health-check myapp --all-pods --include-deps

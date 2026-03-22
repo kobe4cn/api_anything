@@ -1,0 +1,176 @@
+# PTY Interaction Recording
+# Program: redis-cli
+# Args: -h 10.0.1.200 -p 6379 -a ${REDIS_PASSWORD}
+# Prompt Pattern: \d+\.\d+\.\d+\.\d+:\d+>\s*$
+# Description: Redis CLI 交互式数据操作，覆盖主要数据结构的读写场景
+
+## Init Commands:
+SELECT 0
+
+## Command: SET {key} {value}
+## Description: 设置字符串键值，用于缓存单个对象或配置项
+## Output Format: single
+## Sample Output:
+OK
+
+## Command: GET {key}
+## Description: 读取字符串键的值，返回 nil 表示键不存在
+## Output Format: single
+## Sample Output:
+"cached_value_12345"
+
+## Command: SET {key} {value} EX {ttl_seconds}
+## Description: 设置带过期时间的缓存键，单位秒，避免缓存永不过期
+## Output Format: single
+## Sample Output:
+OK
+
+## Command: TTL {key}
+## Description: 查询键的剩余过期时间，-1 永不过期，-2 键不存在
+## Output Format: single
+## Sample Output:
+(integer) 3542
+
+## Command: HSET {hash_key} {field} {value}
+## Description: 向哈希表写入单个字段，用于存储结构化对象（如用户信息）
+## Output Format: single
+## Sample Output:
+(integer) 1
+
+## Command: HGETALL {hash_key}
+## Description: 读取哈希表所有字段和值，返回 field/value 交替的列表
+## Output Format: hash
+## Sample Output:
+ 1) "user_id"
+ 2) "u_10042"
+ 3) "username"
+ 4) "alice"
+ 5) "email"
+ 6) "alice@example.com"
+ 7) "login_count"
+ 8) "147"
+ 9) "last_login"
+10) "2024-01-15T10:30:00Z"
+11) "role"
+12) "admin"
+
+## Command: HMGET {hash_key} {field1} {field2}
+## Description: 批量获取哈希表的指定字段，减少网络往返次数
+## Output Format: list
+## Sample Output:
+1) "alice"
+2) "alice@example.com"
+
+## Command: LPUSH {list_key} {value}
+## Description: 向列表头部插入元素，配合 RPOP 实现 FIFO 队列语义
+## Output Format: single
+## Sample Output:
+(integer) 5
+
+## Command: LRANGE {list_key} {start} {stop}
+## Description: 获取列表指定范围的元素，0 -1 表示获取全部元素
+## Output Format: list
+## Sample Output:
+1) "task:send_email:u_10050"
+2) "task:send_email:u_10049"
+3) "task:send_email:u_10048"
+4) "task:send_email:u_10047"
+5) "task:send_email:u_10046"
+
+## Command: SADD {set_key} {member}
+## Description: 向集合添加成员，集合自动去重，适合存储标签或权限列表
+## Output Format: single
+## Sample Output:
+(integer) 1
+
+## Command: SMEMBERS {set_key}
+## Description: 获取集合的全部成员，注意返回顺序不固定
+## Output Format: set
+## Sample Output:
+1) "read"
+2) "write"
+3) "delete"
+4) "admin"
+5) "audit"
+
+## Command: SISMEMBER {set_key} {member}
+## Description: 判断成员是否属于集合，用于权限检查，O(1) 时间复杂度
+## Output Format: single
+## Sample Output:
+(integer) 1
+
+## Command: ZADD {zset_key} {score} {member}
+## Description: 向有序集合添加成员及分数，分数用于排名（如积分排行榜）
+## Output Format: single
+## Sample Output:
+(integer) 1
+
+## Command: ZRANGE {zset_key} {start} {stop} WITHSCORES
+## Description: 按分数升序获取有序集合成员，WITHSCORES 同时返回分数
+## Output Format: list
+## Sample Output:
+ 1) "user:1003"
+ 2) "820.5"
+ 3) "user:1027"
+ 4) "935.0"
+ 5) "user:1015"
+ 6) "1200.75"
+ 7) "user:1042"
+ 8) "1580.0"
+ 9) "user:1008"
+10) "2340.25"
+
+## Command: ZREVRANK {zset_key} {member}
+## Description: 获取成员在有序集合中的倒序排名（0 为最高分），用于显示用户排名
+## Output Format: single
+## Sample Output:
+(integer) 3
+
+## Command: INCR {counter_key}
+## Description: 原子递增计数器，适用于请求计数、限流等场景，避免竞态条件
+## Output Format: single
+## Sample Output:
+(integer) 10247
+
+## Command: INCRBY {counter_key} {increment}
+## Description: 原子加法，支持指定步长，用于批量计数或积分累加
+## Output Format: single
+## Sample Output:
+(integer) 10297
+
+## Command: INFO server
+## Description: 获取 Redis 服务器基本信息，含版本、运行时长、内存用量
+## Output Format: text
+## Sample Output:
+# Server
+redis_version:7.2.3
+redis_git_sha1:00000000
+redis_git_dirty:0
+redis_build_id:a3fdef44d
+os:Linux 5.15.0-91-generic x86_64
+arch_bits:64
+monotonic_clock:POSIX clock_gettime
+multiplexing_api:epoll
+gcc_version:11.4.0
+process_id:1234
+run_id:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
+tcp_port:6379
+server_time_usec:1705312200123456
+uptime_in_seconds:1234567
+uptime_in_days:14
+hz:10
+configured_hz:10
+aof_enabled:1
+rdb_changes_since_last_save:42
+rdb_last_save_time:1705312000
+used_memory_human:128.50M
+maxmemory_human:2.00G
+maxmemory_policy:allkeys-lru
+
+## Command: KEYS {pattern}
+## Description: 按模式扫描所有匹配的键，生产环境应用 SCAN 代替以避免阻塞
+## Output Format: list
+## Sample Output:
+1) "session:u_10042"
+2) "session:u_10050"
+3) "session:u_10031"

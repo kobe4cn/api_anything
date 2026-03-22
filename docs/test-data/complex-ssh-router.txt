@@ -1,0 +1,164 @@
+# SSH Interaction Sample
+# Host: 10.0.0.1
+# User: netadmin
+# Device: Juniper MX480 Enterprise Router
+# Description: 企业核心路由器运维命令集，含路由协议、访问控制及配置操作
+
+## Command: show ip route
+## Description: 显示完整的 IP 路由表，包含所有协议来源的路由条目
+## Output Format: table
+## Sample Output:
+Codes: C - connected, S - static, R - RIP, B - BGP, O - OSPF, I - IS-IS
+       ia - OSPF inter area, E1 - OSPF external type 1, E2 - OSPF external type 2
+
+Gateway of last resort is 203.0.113.1 to network 0.0.0.0
+
+B*   0.0.0.0/0 [20/0] via 203.0.113.1, 00:47:23
+C    10.0.0.0/24 is directly connected, ge-0/0/0
+C    10.0.1.0/24 is directly connected, ge-0/0/1
+O    10.10.0.0/16 [110/20] via 10.0.0.2, 00:12:05, ge-0/0/0
+O    10.20.0.0/16 [110/30] via 10.0.0.2, 00:12:05, ge-0/0/0
+B    172.16.0.0/12 [20/100] via 203.0.113.1, 01:23:44
+S    192.168.100.0/24 [1/0] via 10.0.0.254
+B    203.0.113.0/24 [20/0] via 203.0.113.1, 01:23:44
+
+## Command: show ip route {prefix} {mask}
+## Description: 查询特定前缀的路由详情，含下一跳和度量值
+## Output Format: text
+## Sample Output:
+Routing entry for 10.10.0.0/16
+  Known via "ospf", distance 110, metric 20
+  Last update from 10.0.0.2 on ge-0/0/0, 00:13:22 ago
+  Routing Descriptor Blocks:
+  * 10.0.0.2, from 10.0.0.2, 00:13:22 ago, via ge-0/0/0
+      Route metric is 20, traffic share count is 1
+      MPLS label: none
+
+## Command: show arp
+## Description: 显示 ARP 缓存表，用于排查二三层连通性问题
+## Output Format: table
+## Sample Output:
+Protocol  Address          Age (min)  Hardware Addr   Type   Interface
+Internet  10.0.0.1                -   00:1a:2b:3c:4d:5e  ARPA   ge-0/0/0
+Internet  10.0.0.2               12   00:1a:2b:3c:4d:5f  ARPA   ge-0/0/0
+Internet  10.0.0.254              5   00:50:56:ab:cd:ef  ARPA   ge-0/0/0
+Internet  10.0.1.10               3   aa:bb:cc:dd:ee:01  ARPA   ge-0/0/1
+Internet  10.0.1.20               8   aa:bb:cc:dd:ee:02  ARPA   ge-0/0/1
+
+## Command: show bgp summary
+## Description: 显示 BGP 邻居状态汇总，含前缀数和会话时长
+## Output Format: table
+## Sample Output:
+BGP router identifier 203.0.113.10, local AS number 65001
+BGP table version is 1842, main routing table version 1842
+523 network entries using 75308 bytes of memory
+
+Neighbor        V    AS MsgRcvd MsgSent TblVer  InQ OutQ Up/Down  State/PfxRcd
+203.0.113.1     4 65100    4821    1234   1842    0    0 01:23:44      487
+10.0.0.2        4 65001     892     891   1842    0    0 00:47:12       36
+10.0.0.3        4 65001     890     890   1842    0    0 00:47:10       36
+
+## Command: show bgp neighbors {neighbor_ip}
+## Description: 查看指定 BGP 邻居的详细会话信息和统计数据
+## Output Format: text
+## Sample Output:
+BGP neighbor is 203.0.113.1, remote AS 65100, external link
+  BGP version 4, remote router ID 203.0.113.1
+  BGP state = Established, up for 01:23:44
+  Last read 00:00:23, last write 00:00:23, hold time is 90
+  Neighbor capabilities:
+    Route refresh: advertised and received(new)
+    Address family IPv4 Unicast: advertised and received
+  Message statistics:
+    InQ depth is 0, OutQ depth is 0
+    Opens:         Rcvd:    1, Sent:    1
+    Updates:       Rcvd: 4780, Sent:  142
+    Keepalives:    Rcvd:   40, Sent:   91
+  Prefix activity:
+    Prefixes Current:  487 (Highest: 512)
+    Implicit Withdraw: 25
+
+## Command: show ospf neighbors
+## Description: 显示所有 OSPF 邻居关系和链路状态
+## Output Format: table
+## Sample Output:
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+10.0.0.2        1     FULL/DR         00:00:37    10.0.0.2        ge-0/0/0
+10.0.0.3        1     FULL/BDR        00:00:38    10.0.0.3        ge-0/0/0
+10.20.0.1       1     FULL/DROTHER    00:00:39    10.20.0.1       ge-0/0/2
+
+## Command: show ospf database summary
+## Description: 显示 OSPF LSDB 摘要，包含各类 LSA 数量
+## Output Format: table
+## Sample Output:
+OSPF Router with ID (10.0.0.1) (Process ID 1)
+
+                Summary Net Link States (Area 0)
+
+Link ID         ADV Router      Age         Seq#       Checksum
+10.10.0.0       10.0.0.2        312         0x80000003 0x00A1B2
+10.20.0.0       10.0.0.3        298         0x80000003 0x00B2C3
+
+## Command: show access-list {acl_name}
+## Description: 查看指定 ACL 的规则列表及命中计数
+## Output Format: text
+## Sample Output:
+Extended IP access list INBOUND-FILTER
+    10 permit tcp 10.0.0.0 0.0.255.255 any eq 80 (1234 matches)
+    20 permit tcp 10.0.0.0 0.0.255.255 any eq 443 (5678 matches)
+    30 permit udp 10.0.0.0 0.0.255.255 any eq 53 (890 matches)
+    40 deny ip 192.168.0.0 0.0.255.255 any log (12 matches)
+    50 deny ip any host 10.0.0.1 (3 matches)
+    60 permit ip any any (99847 matches)
+
+## Command: configure interface {interface} description {description}
+## Description: 为接口添加描述标签（变更操作，会修改设备运行配置）
+## Output Format: text
+## Sample Output:
+[edit interfaces ge-0/0/0]
++   description "uplink-to-datacenter-core";
+Configuration committed.
+
+## Command: ping {destination} count {count} size {size}
+## Description: 向目标地址发送 ICMP 探测报文，验证网络连通性
+## Output Format: text
+## Sample Output:
+PING 10.0.0.2 (10.0.0.2): 56 data bytes
+64 bytes from 10.0.0.2: icmp_seq=0 ttl=255 time=0.453 ms
+64 bytes from 10.0.0.2: icmp_seq=1 ttl=255 time=0.412 ms
+64 bytes from 10.0.0.2: icmp_seq=2 ttl=255 time=0.398 ms
+64 bytes from 10.0.0.2: icmp_seq=3 ttl=255 time=0.441 ms
+64 bytes from 10.0.0.2: icmp_seq=4 ttl=255 time=0.427 ms
+
+--- 10.0.0.2 ping statistics ---
+5 packets transmitted, 5 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 0.398/0.426/0.453/0.020 ms
+
+## Command: traceroute {destination}
+## Description: 追踪报文到目标的逐跳路径，定位网络断点位置
+## Output Format: text
+## Sample Output:
+traceroute to 203.0.113.1 (203.0.113.1), 30 hops max, 40 byte packets
+ 1  10.0.0.2 (10.0.0.2)  0.512 ms  0.489 ms  0.501 ms
+ 2  10.10.0.1 (10.10.0.1)  1.234 ms  1.198 ms  1.221 ms
+ 3  203.0.113.1 (203.0.113.1)  2.876 ms  2.843 ms  2.891 ms
+
+## Command: show interfaces {interface} detail
+## Description: 查看接口详细统计信息，含错误包数用于故障排查
+## Output Format: text
+## Sample Output:
+Physical interface: ge-0/0/0, Enabled, Physical link is Up
+  Link-level type: Ethernet, MTU: 1514, Speed: 1000mbps, Duplex: Full-Duplex
+  Device flags   : Present Running
+  Interface flags: SNMP-Traps Internal: 0x4000
+  Link flags     : None
+  Current address: 00:1a:2b:3c:4d:5e, Hardware address: 00:1a:2b:3c:4d:5e
+  Last flapped   : 2024-01-10 08:23:11 UTC (12w3d 04:21:09 ago)
+  Input rate     : 124512 bps (95 pps)
+  Output rate    : 87234 bps (64 pps)
+  Input errors:
+    Errors: 0, Drops: 0, Framing errors: 0, Runts: 0, Giants: 0
+    CRC/Align errors: 0, FIFO errors: 0, Resource errors: 0
+  Output errors:
+    Carrier transitions: 1, Errors: 0, Drops: 0
+    MTU errors: 0, Resource errors: 0

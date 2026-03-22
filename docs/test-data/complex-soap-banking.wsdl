@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions name="BankingService"
+  targetNamespace="http://bank.example.com/banking"
+  xmlns="http://schemas.xmlsoap.org/wsdl/"
+  xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+  xmlns:tns="http://bank.example.com/banking"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+
+  <types>
+    <xsd:schema targetNamespace="http://bank.example.com/banking">
+
+      <!-- 账户类型枚举：区分储蓄/支票/企业账户的业务规则不同 -->
+      <xsd:simpleType name="AccountType">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="savings"/>
+          <xsd:enumeration value="checking"/>
+          <xsd:enumeration value="business"/>
+        </xsd:restriction>
+      </xsd:simpleType>
+
+      <!-- 转账状态枚举 -->
+      <xsd:simpleType name="TransferStatus">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="pending"/>
+          <xsd:enumeration value="completed"/>
+          <xsd:enumeration value="failed"/>
+          <xsd:enumeration value="reversed"/>
+        </xsd:restriction>
+      </xsd:simpleType>
+
+      <!-- 地址：账户持有人的法定地址，用于合规报告 -->
+      <xsd:complexType name="Address">
+        <xsd:sequence>
+          <xsd:element name="street_line1" type="xsd:string"/>
+          <xsd:element name="street_line2" type="xsd:string" minOccurs="0"/>
+          <xsd:element name="city" type="xsd:string"/>
+          <xsd:element name="state_province" type="xsd:string"/>
+          <xsd:element name="postal_code" type="xsd:string"/>
+          <xsd:element name="country_code" type="xsd:string"/>
+        </xsd:sequence>
+      </xsd:complexType>
+
+      <!-- 账户所有人：包含 KYC 相关字段 -->
+      <xsd:complexType name="AccountOwner">
+        <xsd:sequence>
+          <xsd:element name="owner_id" type="xsd:string"/>
+          <xsd:element name="full_name" type="xsd:string"/>
+          <xsd:element name="national_id" type="xsd:string"/>
+          <xsd:element name="date_of_birth" type="xsd:date"/>
+          <xsd:element name="email" type="xsd:string"/>
+          <xsd:element name="phone" type="xsd:string"/>
+          <!-- 嵌套地址：法律要求的账户持有人居住地 -->
+          <xsd:element name="address" type="tns:Address"/>
+        </xsd:sequence>
+      </xsd:complexType>
+
+      <!-- 货币金额：使用 decimal + 货币代码避免浮点精度丢失 -->
+      <xsd:complexType name="MoneyAmount">
+        <xsd:sequence>
+          <xsd:element name="amount" type="xsd:decimal"/>
+          <xsd:element name="currency_code" type="xsd:string"/>
+          <!-- precision 字段显式指定小数位，各币种规则不同（日元0位，比特币8位） -->
+          <xsd:element name="precision" type="xsd:int"/>
+        </xsd:sequence>
+      </xsd:complexType>
+
+      <!-- 单笔交易记录：对账和审计的最小单元 -->
+      <xsd:complexType name="Transaction">
+        <xsd:sequence>
+          <xsd:element name="transaction_id" type="xsd:string"/>
+          <xsd:element name="type" type="xsd:string"/>
+          <xsd:element name="amount" type="tns:MoneyAmount"/>
+          <xsd:element name="balance_after" type="tns:MoneyAmount"/>
+          <xsd:element name="description" type="xsd:string"/>
+          <xsd:element name="reference_no" type="xsd:string" minOccurs="0"/>
+          <xsd:element name="counterparty_name" type="xsd:string" minOccurs="0"/>
+          <xsd:element name="counterparty_account" type="xsd:string" minOccurs="0"/>
+          <xsd:element name="timestamp" type="xsd:dateTime"/>
+          <xsd:element name="value_date" type="xsd:date"/>
+        </xsd:sequence>
+      </xsd:complexType>
+
+      <!-- ========== GetBalance: 查询账户余额 ========== -->
+      <xsd:element name="GetBalanceRequest">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="account_number" type="xsd:string"/>
+            <!-- 可选的货币换算目标，未指定则返回账户本币 -->
+            <xsd:element name="target_currency" type="xsd:string" minOccurs="0"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <xsd:element name="GetBalanceResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="account_number" type="xsd:string"/>
+            <xsd:element name="account_type" type="tns:AccountType"/>
+            <xsd:element name="available_balance" type="tns:MoneyAmount"/>
+            <xsd:element name="ledger_balance" type="tns:MoneyAmount"/>
+            <!-- 冻结金额：因待处理交易或司法冻结被占用的余额 -->
+            <xsd:element name="frozen_amount" type="tns:MoneyAmount"/>
+            <xsd:element name="as_of_datetime" type="xsd:dateTime"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <!-- ========== TransferFunds: 账户间资金转移 ========== -->
+      <xsd:element name="TransferFundsRequest">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="from_account" type="xsd:string"/>
+            <xsd:element name="to_account" type="xsd:string"/>
+            <xsd:element name="amount" type="tns:MoneyAmount"/>
+            <xsd:element name="description" type="xsd:string"/>
+            <!-- 幂等键：防止网络重试导致的重复转账 -->
+            <xsd:element name="idempotency_key" type="xsd:string"/>
+            <xsd:element name="scheduled_date" type="xsd:date" minOccurs="0"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <xsd:element name="TransferFundsResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="transaction_id" type="xsd:string"/>
+            <xsd:element name="status" type="tns:TransferStatus"/>
+            <xsd:element name="fee" type="tns:MoneyAmount"/>
+            <xsd:element name="executed_at" type="xsd:dateTime"/>
+            <xsd:element name="estimated_arrival" type="xsd:dateTime" minOccurs="0"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <!-- ========== GetStatement: 账单流水（含 Transaction 数组） ========== -->
+      <xsd:element name="GetStatementRequest">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="account_number" type="xsd:string"/>
+            <xsd:element name="from_date" type="xsd:date"/>
+            <xsd:element name="to_date" type="xsd:date"/>
+            <xsd:element name="page" type="xsd:int" minOccurs="0" default="1"/>
+            <xsd:element name="page_size" type="xsd:int" minOccurs="0" default="50"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <xsd:element name="GetStatementResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="account_number" type="xsd:string"/>
+            <xsd:element name="period_from" type="xsd:date"/>
+            <xsd:element name="period_to" type="xsd:date"/>
+            <xsd:element name="opening_balance" type="tns:MoneyAmount"/>
+            <xsd:element name="closing_balance" type="tns:MoneyAmount"/>
+            <xsd:element name="total_credits" type="tns:MoneyAmount"/>
+            <xsd:element name="total_debits" type="tns:MoneyAmount"/>
+            <!-- 交易列表：每页最多 page_size 条，客户端需处理分页 -->
+            <xsd:element name="transactions" type="tns:Transaction" maxOccurs="unbounded"/>
+            <xsd:element name="total_count" type="xsd:int"/>
+            <xsd:element name="page" type="xsd:int"/>
+            <xsd:element name="page_size" type="xsd:int"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <!-- ========== CreateAccount: 开户（含嵌套 Owner 信息） ========== -->
+      <xsd:element name="CreateAccountRequest">
+        <xsd:complexType>
+          <xsd:sequence>
+            <!-- 开户时必须完整提交所有者信息用于 KYC 审核 -->
+            <xsd:element name="owner" type="tns:AccountOwner"/>
+            <xsd:element name="account_type" type="tns:AccountType"/>
+            <xsd:element name="initial_deposit" type="tns:MoneyAmount" minOccurs="0"/>
+            <xsd:element name="preferred_currency" type="xsd:string"/>
+            <xsd:element name="branch_code" type="xsd:string" minOccurs="0"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <xsd:element name="CreateAccountResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="account_number" type="xsd:string"/>
+            <xsd:element name="account_type" type="tns:AccountType"/>
+            <xsd:element name="iban" type="xsd:string"/>
+            <xsd:element name="swift_bic" type="xsd:string"/>
+            <xsd:element name="created_at" type="xsd:dateTime"/>
+            <!-- KYC 审核状态：pending 期间账户功能受限 -->
+            <xsd:element name="kyc_status" type="xsd:string"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <!-- ========== CloseAccount: 销户 ========== -->
+      <xsd:element name="CloseAccountRequest">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="account_number" type="xsd:string"/>
+            <xsd:element name="reason" type="xsd:string"/>
+            <!-- 余额转入账户，为空时以支票方式退还 -->
+            <xsd:element name="transfer_balance_to" type="xsd:string" minOccurs="0"/>
+            <xsd:element name="authorized_by" type="xsd:string"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <xsd:element name="CloseAccountResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="account_number" type="xsd:string"/>
+            <xsd:element name="closed_at" type="xsd:dateTime"/>
+            <xsd:element name="final_balance" type="tns:MoneyAmount"/>
+            <xsd:element name="balance_transfer_id" type="xsd:string" minOccurs="0"/>
+            <xsd:element name="confirmation_number" type="xsd:string"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <!-- ========== GetExchangeRate: 汇率查询 ========== -->
+      <xsd:element name="GetExchangeRateRequest">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="from_currency" type="xsd:string"/>
+            <xsd:element name="to_currency" type="xsd:string"/>
+            <!-- 指定日期查询历史汇率，未指定则返回当前实时汇率 -->
+            <xsd:element name="rate_date" type="xsd:date" minOccurs="0"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <xsd:element name="GetExchangeRateResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="from_currency" type="xsd:string"/>
+            <xsd:element name="to_currency" type="xsd:string"/>
+            <!-- 汇率精度 8 位小数，满足外汇交易精度要求 -->
+            <xsd:element name="rate" type="xsd:decimal"/>
+            <xsd:element name="rate_precision" type="xsd:int"/>
+            <xsd:element name="buy_rate" type="xsd:decimal"/>
+            <xsd:element name="sell_rate" type="xsd:decimal"/>
+            <xsd:element name="mid_rate" type="xsd:decimal"/>
+            <xsd:element name="rate_timestamp" type="xsd:dateTime"/>
+            <xsd:element name="valid_until" type="xsd:dateTime"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+    </xsd:schema>
+  </types>
+
+  <!-- 消息定义 -->
+  <message name="GetBalanceInput"><part name="parameters" element="tns:GetBalanceRequest"/></message>
+  <message name="GetBalanceOutput"><part name="parameters" element="tns:GetBalanceResponse"/></message>
+  <message name="TransferFundsInput"><part name="parameters" element="tns:TransferFundsRequest"/></message>
+  <message name="TransferFundsOutput"><part name="parameters" element="tns:TransferFundsResponse"/></message>
+  <message name="GetStatementInput"><part name="parameters" element="tns:GetStatementRequest"/></message>
+  <message name="GetStatementOutput"><part name="parameters" element="tns:GetStatementResponse"/></message>
+  <message name="CreateAccountInput"><part name="parameters" element="tns:CreateAccountRequest"/></message>
+  <message name="CreateAccountOutput"><part name="parameters" element="tns:CreateAccountResponse"/></message>
+  <message name="CloseAccountInput"><part name="parameters" element="tns:CloseAccountRequest"/></message>
+  <message name="CloseAccountOutput"><part name="parameters" element="tns:CloseAccountResponse"/></message>
+  <message name="GetExchangeRateInput"><part name="parameters" element="tns:GetExchangeRateRequest"/></message>
+  <message name="GetExchangeRateOutput"><part name="parameters" element="tns:GetExchangeRateResponse"/></message>
+
+  <!-- 通用错误消息 -->
+  <message name="BankingFault">
+    <part name="fault" element="tns:GetBalanceRequest"/>
+  </message>
+
+  <portType name="BankingPortType">
+    <operation name="GetBalance">
+      <input message="tns:GetBalanceInput"/>
+      <output message="tns:GetBalanceOutput"/>
+      <fault name="BankingFault" message="tns:BankingFault"/>
+    </operation>
+    <operation name="TransferFunds">
+      <input message="tns:TransferFundsInput"/>
+      <output message="tns:TransferFundsOutput"/>
+      <fault name="BankingFault" message="tns:BankingFault"/>
+    </operation>
+    <operation name="GetStatement">
+      <input message="tns:GetStatementInput"/>
+      <output message="tns:GetStatementOutput"/>
+      <fault name="BankingFault" message="tns:BankingFault"/>
+    </operation>
+    <operation name="CreateAccount">
+      <input message="tns:CreateAccountInput"/>
+      <output message="tns:CreateAccountOutput"/>
+      <fault name="BankingFault" message="tns:BankingFault"/>
+    </operation>
+    <operation name="CloseAccount">
+      <input message="tns:CloseAccountInput"/>
+      <output message="tns:CloseAccountOutput"/>
+      <fault name="BankingFault" message="tns:BankingFault"/>
+    </operation>
+    <operation name="GetExchangeRate">
+      <input message="tns:GetExchangeRateInput"/>
+      <output message="tns:GetExchangeRateOutput"/>
+      <fault name="BankingFault" message="tns:BankingFault"/>
+    </operation>
+  </portType>
+
+  <binding name="BankingBinding" type="tns:BankingPortType">
+    <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <operation name="GetBalance">
+      <soap:operation soapAction="http://bank.example.com/banking/GetBalance"/>
+    </operation>
+    <operation name="TransferFunds">
+      <soap:operation soapAction="http://bank.example.com/banking/TransferFunds"/>
+    </operation>
+    <operation name="GetStatement">
+      <soap:operation soapAction="http://bank.example.com/banking/GetStatement"/>
+    </operation>
+    <operation name="CreateAccount">
+      <soap:operation soapAction="http://bank.example.com/banking/CreateAccount"/>
+    </operation>
+    <operation name="CloseAccount">
+      <soap:operation soapAction="http://bank.example.com/banking/CloseAccount"/>
+    </operation>
+    <operation name="GetExchangeRate">
+      <soap:operation soapAction="http://bank.example.com/banking/GetExchangeRate"/>
+    </operation>
+  </binding>
+
+  <service name="BankingService">
+    <port name="BankingPort" binding="tns:BankingBinding">
+      <soap:address location="https://banking-api.example.com/soap/v2"/>
+    </port>
+  </service>
+</definitions>

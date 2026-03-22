@@ -178,6 +178,16 @@ echo "=========================================="
 
 run_test "pty-mysql-repl" "pty" "docs/test-data/pty-database-repl.txt"
 
+echo ""
+echo "=========================================="
+echo "8. 复杂场景测试"
+echo "=========================================="
+
+run_test "complex-soap-banking" "soap" "docs/test-data/complex-soap-banking.wsdl"
+run_test "complex-cli-devops" "cli" "docs/test-data/complex-cli-devops.txt"
+run_test "complex-ssh-router" "ssh" "docs/test-data/complex-ssh-router.txt"
+run_test "complex-pty-redis" "pty" "docs/test-data/complex-pty-redis.txt"
+
 # ============================================================
 # 全量回归测试
 # ============================================================
