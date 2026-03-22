@@ -51,6 +51,10 @@ pub fn build_app(state: AppState) -> Router {
             "/api/v1/compensation/delivery-records/{id}",
             get(routes::compensation::get_delivery_record),
         )
+        // 文档类端点：OpenAPI JSON 规范、Swagger UI、Agent 提示词
+        .route("/api/v1/docs", get(routes::docs::swagger_ui))
+        .route("/api/v1/docs/openapi.json", get(routes::docs::openapi_json))
+        .route("/api/v1/docs/agent-prompt", get(routes::docs::agent_prompt))
         // 通配路由捕获所有 /gw/ 前缀请求，交由动态路由器分发
         .route("/gw/{*rest}", any(routes::gateway::gateway_handler))
         // 沙箱通配路由：与网关共享路由表，但根据 X-Sandbox-Mode 头走 mock/replay/proxy 分支

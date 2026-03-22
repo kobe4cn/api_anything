@@ -1,4 +1,5 @@
 pub mod compensation;
+pub mod docs;
 pub mod gateway;
 pub mod health;
 pub mod projects;
