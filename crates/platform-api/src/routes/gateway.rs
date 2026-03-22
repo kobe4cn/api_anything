@@ -3,7 +3,11 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
 use api_anything_common::error::AppError;
+use api_anything_common::models::DeliveryStatus;
+use api_anything_compensation::request_logger::RequestLogger;
 use api_anything_gateway::types::GatewayRequest;
+use api_anything_metadata::repo::MetadataRepo;
+use serde_json::json;
 use std::collections::HashMap;
 use crate::state::AppState;
 
@@ -72,6 +76,38 @@ pub async fn gateway_handler(
         .unwrap_or("unknown")
         .to_string();
 
+    // 4. 查询路由配置以获取 delivery_guarantee；
+    //    此处单独查询而非从路由表缓存读取，确保使用最新的数据库配置
+    let route = state.repo.get_route(route_id).await?;
+
+    // 5. 从 Idempotency-Key 头提取幂等键，ExactlyOnce 语义下必须存在；
+    //    提前转为 owned String，避免后续 headers 被移入 GatewayRequest 后仍持有借用
+    let idempotency_key: Option<String> = headers
+        .get("Idempotency-Key")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_owned());
+
+    // 6. 根据 delivery_guarantee 决定是否持久化投递记录；
+    //    AtMostOnce 不记录（发即忘），AtLeastOnce/ExactlyOnce 写入 delivery_records
+    let log_result = RequestLogger::log_if_needed(
+        state.repo.as_ref(),
+        &route.delivery_guarantee,
+        route_id,
+        &trace_id,
+        idempotency_key.as_deref(),
+        &body.clone().unwrap_or(serde_json::json!({})),
+    ).await;
+
+    // AlreadyDelivered 是幂等键命中的正常路径，直接返回 200 告知调用方无需重试；
+    // 其他错误（DB 故障、缺少 Idempotency-Key 等）向上冒泡为 HTTP 错误
+    let delivery_record_id = match log_result {
+        Ok(record_opt) => record_opt.map(|r| r.id),
+        Err(AppError::AlreadyDelivered) => {
+            return Ok((StatusCode::OK, Json(json!({"status": "already_delivered"}))).into_response());
+        }
+        Err(e) => return Err(e),
+    };
+
     let gateway_req = GatewayRequest {
         route_id,
         method,
@@ -83,11 +119,38 @@ pub async fn gateway_handler(
         trace_id,
     };
 
-    // 4. 分发请求：dispatcher 内部按限流→熔断→超时顺序执行保护逻辑
-    let resp = dispatcher.dispatch(gateway_req).await?;
-
-    Ok((
-        StatusCode::from_u16(resp.status_code).unwrap_or(StatusCode::OK),
-        Json(resp.body),
-    ))
+    // 7. 分发请求：dispatcher 内部按限流→熔断→超时顺序执行保护逻辑
+    match dispatcher.dispatch(gateway_req).await {
+        Ok(resp) => {
+            // 投递成功后异步更新状态；使用 let _ 忽略错误，确保状态更新失败不影响正常响应
+            if let Some(record_id) = delivery_record_id {
+                let _ = state.repo.update_delivery_status(
+                    record_id,
+                    DeliveryStatus::Delivered,
+                    None,
+                    None,
+                ).await;
+                if let Some(key) = &idempotency_key {
+                    let _ = state.repo.mark_idempotency_delivered(key, "success").await;
+                }
+            }
+            Ok((
+                StatusCode::from_u16(resp.status_code).unwrap_or(StatusCode::OK),
+                Json(resp.body),
+            ).into_response())
+        }
+        Err(e) => {
+            // 投递失败时调度下次重试（1 秒后），由 retry_worker 按指数退避接管后续重试
+            if let Some(record_id) = delivery_record_id {
+                let next_retry = chrono::Utc::now() + chrono::Duration::seconds(1);
+                let _ = state.repo.update_delivery_status(
+                    record_id,
+                    DeliveryStatus::Failed,
+                    Some(&format!("{e}")),
+                    Some(next_retry),
+                ).await;
+            }
+            Err(e)
+        }
+    }
 }

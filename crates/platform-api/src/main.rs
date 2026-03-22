@@ -1,4 +1,6 @@
 use api_anything_common::config::AppConfig;
+use api_anything_compensation::config::RetryConfig;
+use api_anything_compensation::retry_worker::RetryWorker;
 use api_anything_gateway::dispatcher::BackendDispatcher;
 use api_anything_gateway::loader::RouteLoader;
 use api_anything_gateway::router::DynamicRouter;
@@ -37,6 +39,16 @@ async fn main() -> anyhow::Result<()> {
 
     let loaded = RouteLoader::load(repo.as_ref(), &router, &dispatchers).await?;
     tracing::info!(routes = loaded, "Gateway routes loaded");
+
+    // 启动重试 worker；worker 持有 repo 和 dispatchers 的 Arc 引用，
+    // 与主服务共享同一套资源，无需额外的连接池或配置
+    let retry_worker = RetryWorker::new(
+        repo.clone(),
+        dispatchers.clone(),
+        RetryConfig::default(),
+    );
+    tokio::spawn(async move { retry_worker.run().await });
+    tracing::info!("Retry worker started");
 
     let app = build_app(state);
     let addr = format!("{}:{}", config.api_host, config.api_port);
