@@ -1,5 +1,5 @@
 pub mod config;
+pub mod dead_letter;
 pub mod idempotency;
 pub mod request_logger;
-// pub mod retry_worker;   // Task 2
-// pub mod dead_letter;     // Task 3
+pub mod retry_worker;

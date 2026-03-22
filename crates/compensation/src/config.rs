@@ -37,3 +37,23 @@ impl RetryConfig {
             .unwrap_or(*self.delays.last().unwrap_or(&Duration::from_secs(1800)))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn delay_for_attempt_returns_correct_values() {
+        let config = RetryConfig::default();
+        assert_eq!(config.delay_for_attempt(0), Duration::from_secs(1));
+        assert_eq!(config.delay_for_attempt(1), Duration::from_secs(5));
+        assert_eq!(config.delay_for_attempt(4), Duration::from_secs(1800));
+    }
+
+    #[test]
+    fn delay_caps_at_last_value() {
+        // 超出预设序列的 attempt 应封顶返回最后一项，而非 panic 或返回默认值
+        let config = RetryConfig::default();
+        assert_eq!(config.delay_for_attempt(99), Duration::from_secs(1800));
+    }
+}

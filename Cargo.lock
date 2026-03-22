@@ -129,8 +129,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "api-anything-common",
+ "api-anything-gateway",
  "api-anything-metadata",
+ "axum 0.8.8",
  "chrono",
+ "dashmap",
  "dotenvy",
  "serde",
  "serde_json",
@@ -206,6 +209,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "api-anything-common",
+ "api-anything-compensation",
  "api-anything-gateway",
  "api-anything-generator",
  "api-anything-metadata",

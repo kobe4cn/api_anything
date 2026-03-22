@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 api-anything-common = { path = "../common" }
 api-anything-metadata = { path = "../metadata" }
+api-anything-gateway = { path = "../gateway" }
 tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -13,6 +14,8 @@ uuid.workspace = true
 chrono.workspace = true
 tracing.workspace = true
 anyhow.workspace = true
+dashmap.workspace = true
+axum.workspace = true
 
 [dev-dependencies]
 sqlx.workspace = true
