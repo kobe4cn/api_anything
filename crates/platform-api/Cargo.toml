@@ -8,6 +8,7 @@ api-anything-common = { path = "../common" }
 api-anything-metadata = { path = "../metadata" }
 api-anything-gateway = { path = "../gateway" }
 api-anything-sandbox = { path = "../sandbox" }
+api-anything-compensation = { path = "../compensation" }
 axum.workspace = true
 tokio.workspace = true
 tower.workspace = true

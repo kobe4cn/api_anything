@@ -6,7 +6,6 @@ use axum::routing::{any, delete, get, post};
 use axum::Router;
 use state::AppState;
 use tower_http::trace::TraceLayer;
-
 // build_app 接受已初始化的 AppState，使 main.rs 可在启动前先执行路由加载，
 // 测试代码也可以传入预填充的 state 来验证特定场景
 pub fn build_app(state: AppState) -> Router {
@@ -31,8 +30,31 @@ pub fn build_app(state: AppState) -> Router {
             "/api/v1/sandbox-sessions/{id}",
             delete(routes::sandbox_sessions::delete_sandbox_session),
         )
+        // 补偿系统管理 API：死信队列查询、重试、批量重试、人工解决
+        .route(
+            "/api/v1/compensation/dead-letters",
+            get(routes::compensation::list_dead_letters),
+        )
+        .route(
+            "/api/v1/compensation/dead-letters/batch-retry",
+            post(routes::compensation::batch_retry),
+        )
+        .route(
+            "/api/v1/compensation/dead-letters/{id}/retry",
+            post(routes::compensation::retry_dead_letter),
+        )
+        .route(
+            "/api/v1/compensation/dead-letters/{id}/resolve",
+            post(routes::compensation::resolve_dead_letter),
+        )
+        .route(
+            "/api/v1/compensation/delivery-records/{id}",
+            get(routes::compensation::get_delivery_record),
+        )
         // 通配路由捕获所有 /gw/ 前缀请求，交由动态路由器分发
         .route("/gw/{*rest}", any(routes::gateway::gateway_handler))
+        // 沙箱通配路由：与网关共享路由表，但根据 X-Sandbox-Mode 头走 mock/replay/proxy 分支
+        .route("/sandbox/{*rest}", any(routes::sandbox::sandbox_handler))
         .fallback(middleware::error_handler::fallback)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
