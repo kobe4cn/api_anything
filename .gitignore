@@ -20,3 +20,7 @@ docker/data/
 
 # Generated artifacts
 artifacts/
+
+# Web frontend
+web/node_modules/
+web/dist/
