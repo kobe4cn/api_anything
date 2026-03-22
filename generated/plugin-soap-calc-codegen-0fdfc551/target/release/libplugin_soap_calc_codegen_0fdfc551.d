@@ -1,0 +1,1 @@
+/Users/kevin/dev/ai/api_anything/generated/plugin-soap-calc-codegen-0fdfc551/target/release/libplugin_soap_calc_codegen_0fdfc551.dylib: /Users/kevin/dev/ai/api_anything/crates/plugin-sdk/src/lib.rs /Users/kevin/dev/ai/api_anything/generated/plugin-soap-calc-codegen-0fdfc551/src/lib.rs

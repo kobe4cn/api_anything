@@ -1,5 +1,6 @@
 use crate::cli_help::mapper::CliMapper;
 use crate::cli_help::parser::CliHelpParser;
+use crate::codegen::CodegenEngine;
 use crate::llm::client::LlmClient;
 use crate::openapi::OpenApiGenerator;
 use crate::ssh_sample::mapper::SshMapper;
@@ -8,6 +9,7 @@ use crate::wsdl::{llm_mapper::LlmEnhancedMapper, mapper::WsdlMapper, parser::Wsd
 use api_anything_common::models::*;
 use api_anything_metadata::MetadataRepo;
 use serde_json::Value;
+use std::path::PathBuf;
 use uuid::Uuid;
 
 pub struct GenerationPipeline;
@@ -17,59 +19,251 @@ pub struct GenerationResult {
     pub contract_id: Uuid,
     pub routes_count: usize,
     pub openapi_spec: Value,
+    /// LLM 代码生成模式下的编译产物路径
+    pub plugin_path: Option<PathBuf>,
+    /// LLM 代码生成模式下的 Rust 源码
+    pub source_code: Option<String>,
 }
 
 impl GenerationPipeline {
-    /// WSDL 生成管道，接受可选的 LLM 客户端。
-    /// 有 LLM 时使用 LlmEnhancedMapper 优化 HTTP 方法和路径设计，
-    /// 无 LLM 时回退到确定性映射，保证功能完整。
-    pub async fn run_wsdl(
+    // =========================================================================
+    // 新的统一入口 — LLM 驱动的代码生成流水线
+    // =========================================================================
+
+    /// 统一的生成入口，所有接口类型共用同一流程。
+    ///
+    /// 有 LLM 时走 7 阶段代码生成流水线（LLM 分析 -> 生成 Rust 代码 -> 编译 .so -> 测试 -> 文档 -> 观测 -> 产物存储）。
+    /// 无 LLM 时打印明确警告，降级到确定性规则映射（仅 WSDL/CLI/SSH 支持）。
+    pub async fn generate(
         repo: &impl MetadataRepo,
         project_id: Uuid,
-        wsdl_content: &str,
+        interface_type: &str,
+        input_content: &str,
+        project_name: &str,
         llm: Option<&dyn LlmClient>,
+        workspace_dir: &std::path::Path,
+        sdk_path: &std::path::Path,
     ) -> Result<GenerationResult, anyhow::Error> {
-        // Stage 1: 解析 WSDL 文档，提取服务结构、消息定义和操作列表
-        tracing::info!("Stage 1: Parsing WSDL");
-        let wsdl = WsdlParser::parse(wsdl_content)?;
-
-        // Stage 2: 根据 LLM 可用性选择映射策略
-        let contract = if let Some(llm_client) = llm {
-            tracing::info!("Stage 2: LLM-enhanced mapping to UnifiedContract");
-            LlmEnhancedMapper::map(&wsdl, llm_client).await?
-        } else {
-            tracing::info!("Stage 2: Deterministic mapping to UnifiedContract");
-            WsdlMapper::map(&wsdl)?
+        let protocol_type = match interface_type {
+            "soap" | "wsdl" => ProtocolType::Soap,
+            "odata" | "openapi" | "rest" => ProtocolType::Http,
+            "cli" => ProtocolType::Cli,
+            "ssh" => ProtocolType::Ssh,
+            "pty" => ProtocolType::Pty,
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Unsupported interface type: {}",
+                    interface_type
+                ))
+            }
         };
 
-        // Stage 3: 持久化合约，保存原始 schema 以便后续审计或重新解析
-        tracing::info!("Stage 3: Persisting to metadata");
+        if let Some(llm_client) = llm {
+            Self::generate_with_llm(
+                repo,
+                project_id,
+                interface_type,
+                input_content,
+                project_name,
+                llm_client,
+                workspace_dir,
+                sdk_path,
+                protocol_type,
+            )
+            .await
+        } else {
+            // 无 LLM 时降级，但发出明确警告让用户知道功能受限
+            tracing::warn!(
+                "No LLM configured — using basic deterministic mapping. \
+                 This produces generic adapters without type-safe code generation. \
+                 Configure LLM_PROVIDER and API key in .env for full functionality."
+            );
+            Self::generate_deterministic(
+                repo,
+                project_id,
+                interface_type,
+                input_content,
+                project_name,
+                protocol_type,
+            )
+            .await
+        }
+    }
+
+    /// LLM 驱动的 7 阶段代码生成流水线
+    async fn generate_with_llm(
+        repo: &impl MetadataRepo,
+        project_id: Uuid,
+        interface_type: &str,
+        input_content: &str,
+        project_name: &str,
+        llm: &dyn LlmClient,
+        workspace_dir: &std::path::Path,
+        sdk_path: &std::path::Path,
+        protocol_type: ProtocolType,
+    ) -> Result<GenerationResult, anyhow::Error> {
+        // 确保工作目录存在
+        std::fs::create_dir_all(workspace_dir)?;
+
+        let engine = CodegenEngine::new(
+            llm,
+            workspace_dir.to_path_buf(),
+            sdk_path.to_path_buf(),
+        );
+
+        // Stage 1-7: 完整的代码生成流水线
+        let codegen_result = engine
+            .generate(interface_type, input_content, project_name)
+            .await?;
+
+        // 持久化到数据库
+        tracing::info!("Persisting generated artifacts to metadata");
         let db_contract = repo
             .create_contract(
                 project_id,
                 "1.0.0",
-                wsdl_content,
-                &serde_json::to_value(&contract)?,
+                input_content,
+                &serde_json::json!({
+                    "generator": "llm_codegen",
+                    "llm_model": llm.model_name(),
+                    "interface_type": interface_type,
+                    "routes_count": codegen_result.routes.len(),
+                }),
             )
             .await?;
 
-        // Stage 4: 为每个操作创建后端绑定和路由记录，
-        // 后端绑定携带 SOAP 转发所需的 endpoint_url、soapAction 等运行时参数
+        let mut routes_count = 0;
+        for route in &codegen_result.routes {
+            let endpoint_config = serde_json::json!({
+                "plugin_path": codegen_result.plugin_path.to_str(),
+                "interface_type": interface_type,
+                "operation_name": route.operation_name,
+            });
+
+            let method = match route.method.to_uppercase().as_str() {
+                "GET" => HttpMethod::Get,
+                "PUT" => HttpMethod::Put,
+                "DELETE" => HttpMethod::Delete,
+                "PATCH" => HttpMethod::Patch,
+                _ => HttpMethod::Post,
+            };
+
+            let binding = repo
+                .create_backend_binding(protocol_type.clone(), &endpoint_config, 30000)
+                .await?;
+
+            repo.create_route(
+                db_contract.id,
+                method,
+                &route.path,
+                &route.request_schema,
+                &route.response_schema,
+                &endpoint_config,
+                binding.id,
+            )
+            .await?;
+            routes_count += 1;
+        }
+
+        Ok(GenerationResult {
+            contract_id: db_contract.id,
+            routes_count,
+            openapi_spec: codegen_result.openapi_spec,
+            plugin_path: Some(codegen_result.plugin_path),
+            source_code: Some(codegen_result.source_code),
+        })
+    }
+
+    /// 无 LLM 时的确定性降级：沿用原有的解析器 + 映射器逻辑。
+    /// 仅支持 WSDL/CLI/SSH 三种已实现解析器的接口类型。
+    async fn generate_deterministic(
+        repo: &impl MetadataRepo,
+        project_id: Uuid,
+        interface_type: &str,
+        input_content: &str,
+        project_name: &str,
+        protocol_type: ProtocolType,
+    ) -> Result<GenerationResult, anyhow::Error> {
+        match interface_type {
+            "soap" | "wsdl" => {
+                // 复用现有 WSDL 确定性管道
+                let wsdl = WsdlParser::parse(input_content)?;
+                let contract = WsdlMapper::map(&wsdl)?;
+                Self::persist_unified_contract(
+                    repo,
+                    project_id,
+                    input_content,
+                    &contract,
+                    protocol_type,
+                    project_name,
+                )
+                .await
+            }
+            "cli" => {
+                // CLI 降级只解析主帮助，不支持子命令详情
+                let cli_def = CliHelpParser::parse_main(input_content)?;
+                let contract = CliMapper::map(&cli_def, project_name)?;
+                Self::persist_unified_contract(
+                    repo,
+                    project_id,
+                    input_content,
+                    &contract,
+                    protocol_type,
+                    project_name,
+                )
+                .await
+            }
+            "ssh" => {
+                let ssh_def = SshSampleParser::parse(input_content)?;
+                let contract = SshMapper::map(&ssh_def)?;
+                Self::persist_unified_contract(
+                    repo,
+                    project_id,
+                    input_content,
+                    &contract,
+                    protocol_type,
+                    project_name,
+                )
+                .await
+            }
+            _ => Err(anyhow::anyhow!(
+                "Interface type '{}' requires LLM — no deterministic fallback available. \
+                 Configure LLM_PROVIDER and API key in .env.",
+                interface_type
+            )),
+        }
+    }
+
+    /// 将统一合约持久化到数据库并生成 OpenAPI 规范（确定性模式使用）
+    async fn persist_unified_contract(
+        repo: &impl MetadataRepo,
+        project_id: Uuid,
+        original_schema: &str,
+        contract: &crate::unified_contract::UnifiedContract,
+        protocol_type: ProtocolType,
+        _project_name: &str,
+    ) -> Result<GenerationResult, anyhow::Error> {
+        let db_contract = repo
+            .create_contract(
+                project_id,
+                "1.0.0",
+                original_schema,
+                &serde_json::to_value(contract)?,
+            )
+            .await?;
+
         let mut routes_count = 0;
         for op in &contract.operations {
             let endpoint_config = serde_json::json!({
                 "url": op.endpoint_url,
                 "soap_action": op.soap_action,
                 "operation_name": op.name,
-                "namespace": wsdl.target_namespace,
             });
 
             let binding = repo
-                .create_backend_binding(ProtocolType::Soap, &endpoint_config, 30000)
+                .create_backend_binding(protocol_type.clone(), &endpoint_config, 30000)
                 .await?;
 
-            // SOAP 操作固定为 POST，此处 match 保留扩展性，
-            // 方便将来支持 REST-style WSDL（如 HTTP binding）
             let method = match op.http_method.as_str() {
                 "GET" => HttpMethod::Get,
                 "PUT" => HttpMethod::Put,
@@ -102,7 +296,97 @@ impl GenerationPipeline {
             routes_count += 1;
         }
 
-        // Stage 5: 生成 OpenAPI 规范，供客户端 SDK 生成和文档展示使用
+        let openapi = OpenApiGenerator::generate(contract);
+
+        Ok(GenerationResult {
+            contract_id: db_contract.id,
+            routes_count,
+            openapi_spec: openapi,
+            plugin_path: None,
+            source_code: None,
+        })
+    }
+
+    // =========================================================================
+    // 保留原有入口（向后兼容），内部委托给新的统一 generate() 或确定性逻辑
+    // =========================================================================
+
+    /// WSDL 生成管道（保留原签名，向后兼容现有调用方和测试）。
+    /// 有 LLM 时使用 LlmEnhancedMapper 优化 HTTP 方法和路径设计，
+    /// 无 LLM 时回退到确定性映射，保证功能完整。
+    pub async fn run_wsdl(
+        repo: &impl MetadataRepo,
+        project_id: Uuid,
+        wsdl_content: &str,
+        llm: Option<&dyn LlmClient>,
+    ) -> Result<GenerationResult, anyhow::Error> {
+        // 保留原有确定性逻辑，因为 LLM 增强在此路径中仅优化路由映射而非生成完整代码
+        tracing::info!("Stage 1: Parsing WSDL");
+        let wsdl = WsdlParser::parse(wsdl_content)?;
+
+        let contract = if let Some(llm_client) = llm {
+            tracing::info!("Stage 2: LLM-enhanced mapping to UnifiedContract");
+            LlmEnhancedMapper::map(&wsdl, llm_client).await?
+        } else {
+            tracing::info!("Stage 2: Deterministic mapping to UnifiedContract");
+            WsdlMapper::map(&wsdl)?
+        };
+
+        tracing::info!("Stage 3: Persisting to metadata");
+        let db_contract = repo
+            .create_contract(
+                project_id,
+                "1.0.0",
+                wsdl_content,
+                &serde_json::to_value(&contract)?,
+            )
+            .await?;
+
+        let mut routes_count = 0;
+        for op in &contract.operations {
+            let endpoint_config = serde_json::json!({
+                "url": op.endpoint_url,
+                "soap_action": op.soap_action,
+                "operation_name": op.name,
+                "namespace": wsdl.target_namespace,
+            });
+
+            let binding = repo
+                .create_backend_binding(ProtocolType::Soap, &endpoint_config, 30000)
+                .await?;
+
+            let method = match op.http_method.as_str() {
+                "GET" => HttpMethod::Get,
+                "PUT" => HttpMethod::Put,
+                "DELETE" => HttpMethod::Delete,
+                "PATCH" => HttpMethod::Patch,
+                _ => HttpMethod::Post,
+            };
+
+            let request_schema = op
+                .input
+                .as_ref()
+                .map(|m| m.schema.clone())
+                .unwrap_or(serde_json::json!({}));
+            let response_schema = op
+                .output
+                .as_ref()
+                .map(|m| m.schema.clone())
+                .unwrap_or(serde_json::json!({}));
+
+            repo.create_route(
+                db_contract.id,
+                method,
+                &op.path,
+                &request_schema,
+                &response_schema,
+                &endpoint_config,
+                binding.id,
+            )
+            .await?;
+            routes_count += 1;
+        }
+
         tracing::info!("Stage 5: Generating OpenAPI spec");
         let openapi = OpenApiGenerator::generate(&contract);
 
@@ -110,26 +394,23 @@ impl GenerationPipeline {
             contract_id: db_contract.id,
             routes_count,
             openapi_spec: openapi,
+            plugin_path: None,
+            source_code: None,
         })
     }
 
-    /// CLI 管道：解析主帮助文本和各子命令帮助，映射为统一合约后走相同的持久化和 OpenAPI 生成流程。
-    /// subcommand_helps 允许调用方按需传入子命令的详细帮助，未传入的子命令 options 列表保持为空。
-    /// llm 参数为可选 LLM 客户端，当前保留为将来 CLI LLM 增强做入口。
+    /// CLI 管道（保留原签名，向后兼容）
     pub async fn run_cli(
         repo: &impl MetadataRepo,
         project_id: Uuid,
         program_name: &str,
         main_help: &str,
-        subcommand_helps: &[(&str, &str)], // (name, help_text)
+        subcommand_helps: &[(&str, &str)],
         _llm: Option<&dyn LlmClient>,
     ) -> Result<GenerationResult, anyhow::Error> {
-        // Stage 1: 解析主帮助文本，获取程序名、子命令列表和全局选项
         tracing::info!("Stage 1: Parsing CLI help");
         let mut cli_def = CliHelpParser::parse_main(main_help)?;
 
-        // 用各子命令的详细帮助丰富 options 列表；
-        // 若子命令不在主帮助中则忽略，保证健壮性
         for (name, help) in subcommand_helps {
             let sub = CliHelpParser::parse_subcommand(help)?;
             if let Some(existing) = cli_def.subcommands.iter_mut().find(|s| s.name == *name) {
@@ -137,11 +418,9 @@ impl GenerationPipeline {
             }
         }
 
-        // Stage 2: 将 CLI 定义映射为统一合约，HTTP 方法由子命令名语义推断
         tracing::info!("Stage 2: Mapping CLI to UnifiedContract");
         let contract = CliMapper::map(&cli_def, program_name)?;
 
-        // Stage 3: 持久化合约，原始 schema 存主帮助文本，便于后续审计
         tracing::info!("Stage 3: Persisting to metadata");
         let db_contract = repo
             .create_contract(
@@ -152,9 +431,6 @@ impl GenerationPipeline {
             )
             .await?;
 
-        // Stage 4: 为每个子命令创建 CLI 协议绑定和路由记录。
-        // endpoint_config 携带运行时执行命令所需的 program、subcommand 和 output_format，
-        // 供 CLI 适配器（Phase2a-T4）在调度时拼接完整命令行
         let mut routes_count = 0;
         for op in &contract.operations {
             let endpoint_config = serde_json::json!({
@@ -199,7 +475,6 @@ impl GenerationPipeline {
             routes_count += 1;
         }
 
-        // Stage 5: 生成 OpenAPI 规范
         tracing::info!("Stage 5: Generating OpenAPI spec");
         let openapi = OpenApiGenerator::generate(&contract);
 
@@ -207,27 +482,24 @@ impl GenerationPipeline {
             contract_id: db_contract.id,
             routes_count,
             openapi_spec: openapi,
+            plugin_path: None,
+            source_code: None,
         })
     }
 
-    /// SSH 样本管道：解析 SSH 交互样本文本，映射为统一合约，持久化后生成 OpenAPI 规范。
-    /// 流程结构与 run_wsdl / run_cli 保持一致，仅 Stage 1-2 使用 SSH 专属解析器和映射器。
-    /// llm 参数为可选 LLM 客户端，当前保留为将来 SSH LLM 增强做入口。
+    /// SSH 样本管道（保留原签名，向后兼容）
     pub async fn run_ssh(
         repo: &impl MetadataRepo,
         project_id: Uuid,
         sample_text: &str,
         _llm: Option<&dyn LlmClient>,
     ) -> Result<GenerationResult, anyhow::Error> {
-        // Stage 1: 解析 SSH 交互样本，提取 host、user 和命令列表
         tracing::info!("Stage 1: Parsing SSH sample");
         let ssh_def = SshSampleParser::parse(sample_text)?;
 
-        // Stage 2: 将 SSH 定义映射为统一合约，HTTP 方法由命令首词语义决定
         tracing::info!("Stage 2: Mapping SSH sample to UnifiedContract");
         let contract = SshMapper::map(&ssh_def)?;
 
-        // Stage 3: 持久化合约，原始样本文本保留以便后续审计
         tracing::info!("Stage 3: Persisting to metadata");
         let db_contract = repo
             .create_contract(
@@ -238,9 +510,6 @@ impl GenerationPipeline {
             )
             .await?;
 
-        // Stage 4: 为每个 SSH 命令创建后端绑定和路由记录。
-        // endpoint_config 携带 SSH 连接参数（host、user、command_template、output_format），
-        // 供 SSH 适配器（Phase2b-T3）在调度时建立连接并执行命令
         let mut routes_count = 0;
         for (op, cmd) in contract.operations.iter().zip(ssh_def.commands.iter()) {
             let endpoint_config = serde_json::json!({
@@ -286,7 +555,6 @@ impl GenerationPipeline {
             routes_count += 1;
         }
 
-        // Stage 5: 生成 OpenAPI 规范
         tracing::info!("Stage 5: Generating OpenAPI spec");
         let openapi = OpenApiGenerator::generate(&contract);
 
@@ -294,6 +562,8 @@ impl GenerationPipeline {
             contract_id: db_contract.id,
             routes_count,
             openapi_spec: openapi,
+            plugin_path: None,
+            source_code: None,
         })
     }
 }

@@ -5,6 +5,7 @@ use api_anything_generator::pipeline::GenerationPipeline;
 use api_anything_metadata::{MetadataRepo, PgMetadataRepo};
 use clap::Parser;
 use sqlx::PgPool;
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(
@@ -57,6 +58,25 @@ enum Commands {
         /// Path to the CLI executable
         #[arg(long)]
         program: String,
+    },
+
+    /// [New] LLM-driven code generation: analyze interface -> generate Rust code -> compile .so -> load to gateway
+    Codegen {
+        /// Path to interface definition file (WSDL, OData $metadata, OpenAPI spec, CLI help, SSH sample, PTY recording)
+        #[arg(short, long)]
+        source: String,
+
+        /// Interface type: soap, odata, openapi, cli, ssh, pty
+        #[arg(short = 't', long)]
+        interface_type: String,
+
+        /// Project name
+        #[arg(short, long)]
+        project: String,
+
+        /// Working directory for generated crates (default: ./generated)
+        #[arg(long, default_value = "./generated")]
+        workspace: String,
     },
 }
 
@@ -214,6 +234,79 @@ async fn main() -> anyhow::Result<()> {
                 serde_json::to_string_pretty(&result.openapi_spec)?,
             )?;
             println!("  OpenAPI spec: {}", spec_path);
+        }
+
+        Commands::Codegen {
+            source,
+            interface_type,
+            project,
+            workspace,
+        } => {
+            let config = AppConfig::from_env();
+            let pool = PgPool::connect(&config.database_url).await?;
+            let repo = PgMetadataRepo::new(pool);
+            repo.run_migrations().await?;
+
+            let input_content = std::fs::read_to_string(&source)
+                .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", source, e))?;
+
+            let source_type = match interface_type.as_str() {
+                "soap" | "wsdl" => SourceType::Wsdl,
+                "odata" | "openapi" | "rest" => SourceType::Odata,
+                "cli" => SourceType::Cli,
+                "ssh" => SourceType::Ssh,
+                "pty" => SourceType::Pty,
+                _ => return Err(anyhow::anyhow!("Unknown interface type: {}", interface_type)),
+            };
+
+            let project_obj = repo
+                .create_project(
+                    &project,
+                    &format!("LLM-generated {} wrapper", interface_type),
+                    "cli",
+                    source_type,
+                )
+                .await?;
+
+            let workspace_dir = PathBuf::from(&workspace);
+            // plugin-sdk 路径相对于项目根目录
+            let sdk_path = std::env::current_dir()?.join("crates/plugin-sdk");
+
+            let result = GenerationPipeline::generate(
+                &repo,
+                project_obj.id,
+                &interface_type,
+                &input_content,
+                &project,
+                llm_client.as_deref(),
+                &workspace_dir,
+                &sdk_path,
+            )
+            .await?;
+
+            println!("Codegen complete!");
+            println!("  Contract ID: {}", result.contract_id);
+            println!("  Routes created: {}", result.routes_count);
+
+            if let Some(plugin_path) = &result.plugin_path {
+                println!("  Plugin binary: {}", plugin_path.display());
+            }
+
+            // 将 OpenAPI 规范写入文件
+            let spec_path = format!("{}.openapi.json", source);
+            std::fs::write(
+                &spec_path,
+                serde_json::to_string_pretty(&result.openapi_spec)?,
+            )?;
+            println!("  OpenAPI spec: {}", spec_path);
+
+            // 如果有源码，保存到 workspace 下供审计
+            if let Some(source_code) = &result.source_code {
+                let source_path = workspace_dir.join(format!("{}-source.rs", project));
+                std::fs::create_dir_all(&workspace_dir)?;
+                std::fs::write(&source_path, source_code)?;
+                println!("  Source code: {}", source_path.display());
+            }
         }
     }
 
