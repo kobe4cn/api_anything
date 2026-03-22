@@ -359,6 +359,17 @@ impl MetadataRepo for PgMetadataRepo {
         Ok(interactions)
     }
 
+    async fn delete_recorded_interactions(
+        &self,
+        session_id: Uuid,
+    ) -> Result<u64, AppError> {
+        let result = sqlx::query("DELETE FROM recorded_interactions WHERE session_id = $1")
+            .bind(session_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
+    }
+
     async fn create_delivery_record(
         &self,
         route_id: Uuid,

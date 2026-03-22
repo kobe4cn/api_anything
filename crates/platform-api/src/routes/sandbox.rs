@@ -108,6 +108,9 @@ pub async fn sandbox_handler(
                 .get(&route_id)
                 .ok_or_else(|| AppError::Internal(format!("No dispatcher for route {route_id}")))?;
 
+            // 保留请求体副本，代理转发后用于录制交互记录
+            let request_body = body.clone().unwrap_or(serde_json::json!({}));
+
             // query_params 在沙箱场景下目前不做解析；代理转发时后端可通过 path 自行提取
             let gateway_req = GatewayRequest {
                 route_id,
@@ -120,7 +123,18 @@ pub async fn sandbox_handler(
                 trace_id: "sandbox".to_string(),
             };
 
+            let start = std::time::Instant::now();
             let resp = ProxyLayer::proxy(dispatcher.value().as_ref(), &session, gateway_req).await?;
+            let duration_ms = start.elapsed().as_millis() as i32;
+
+            // 代理成功后自动录制交互，供 replay 模式回放使用；
+            // 录制失败不影响代理响应——用 let _ 忽略结果，避免录制侧的瞬态故障阻塞主请求
+            let response_value = serde_json::to_value(&resp.body).unwrap_or(serde_json::json!({}));
+            let _ = state
+                .repo
+                .record_interaction(sid, route_id, &request_body, &response_value, duration_ms)
+                .await;
+
             Ok((
                 StatusCode::from_u16(resp.status_code).unwrap_or(StatusCode::OK),
                 Json(resp.body),

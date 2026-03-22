@@ -87,6 +87,12 @@ pub trait MetadataRepo: Send + Sync {
         session_id: Uuid,
     ) -> Result<Vec<RecordedInteraction>, AppError>;
 
+    /// 清空指定会话的所有录制数据，用于重置测试状态或释放存储空间
+    async fn delete_recorded_interactions(
+        &self,
+        session_id: Uuid,
+    ) -> Result<u64, AppError>;
+
     // ── 投递记录（补偿系统基础） ──────────────────────────────────────────
 
     /// 创建投递记录，在请求实际分发前写入，确保即使后端失败也有可重试凭据
