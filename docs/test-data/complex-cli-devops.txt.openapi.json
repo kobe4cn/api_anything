@@ -1,30 +1,26 @@
 {
   "info": {
-    "title": "test-pty-mysql-repl API",
+    "title": "test-complex-cli-devops API",
     "version": "1.0.0"
   },
   "openapi": "3.0.3",
   "paths": {
-    "/gw/api/processlist": {
-      "get": {
-        "operationId": "getProcessList",
+    "/gw/delete/{app}": {
+      "delete": {
+        "operationId": "deleteApplication",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
                   "properties": {
-                    "command": {
+                    "message": {
                       "type": "string"
                     },
-                    "output": {
-                      "type": "string"
+                    "success": {
+                      "type": "boolean"
                     }
                   },
-                  "required": [
-                    "output",
-                    "command"
-                  ],
                   "type": "object"
                 }
               }
@@ -44,29 +40,46 @@
             "description": "Backend timeout"
           }
         },
-        "summary": "Returns the current MySQL process list"
+        "summary": "Deletes a deployed application"
       }
     },
-    "/gw/api/tables/status": {
-      "get": {
-        "operationId": "getTableStatus",
+    "/gw/deploy": {
+      "post": {
+        "operationId": "deployApplication",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "app": {
+                    "type": "string"
+                  },
+                  "entrypoint": {
+                    "type": "string"
+                  },
+                  "project": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
                   "properties": {
-                    "command": {
+                    "deployment": {
                       "type": "string"
                     },
-                    "output": {
+                    "url": {
                       "type": "string"
                     }
                   },
-                  "required": [
-                    "output",
-                    "command"
-                  ],
                   "type": "object"
                 }
               }
@@ -86,29 +99,25 @@
             "description": "Backend timeout"
           }
         },
-        "summary": "Returns status information for a specific database table"
+        "summary": "Deploys an application using deployctl"
       }
     },
-    "/gw/api/users/count": {
+    "/gw/health_check": {
       "get": {
-        "operationId": "getUsersCount",
+        "operationId": "healthCheck",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
                   "properties": {
-                    "command": {
+                    "output": {
                       "type": "string"
                     },
-                    "output": {
+                    "status": {
                       "type": "string"
                     }
                   },
-                  "required": [
-                    "output",
-                    "command"
-                  ],
                   "type": "object"
                 }
               }
@@ -128,29 +137,22 @@
             "description": "Backend timeout"
           }
         },
-        "summary": "Returns the count of active users from the database"
+        "summary": "Performs a health check on the deployctl service"
       }
     },
-    "/gw/api/users/list": {
+    "/gw/logs/{app}": {
       "get": {
-        "operationId": "listUsers",
+        "operationId": "getApplicationLogs",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
                   "properties": {
-                    "command": {
-                      "type": "string"
-                    },
-                    "output": {
+                    "logs": {
                       "type": "string"
                     }
                   },
-                  "required": [
-                    "output",
-                    "command"
-                  ],
                   "type": "object"
                 }
               }
@@ -170,7 +172,80 @@
             "description": "Backend timeout"
           }
         },
-        "summary": "Returns a list of users ordered by creation date with a configurable limit"
+        "summary": "Retrieves logs for a deployed application"
+      }
+    },
+    "/gw/upgrade": {
+      "post": {
+        "operationId": "upgradeDeployctl",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Upgrades the deployctl CLI tool"
+      }
+    },
+    "/gw/{command}": {
+      "get": {
+        "operationId": "executeCommand",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "output": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Executes any deployctl subcommand dynamically"
       }
     }
   }

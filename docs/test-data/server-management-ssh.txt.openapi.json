@@ -1,24 +1,124 @@
 {
   "info": {
-    "title": "test-ssh-network-switch API",
+    "title": "test-ssh-server-mgmt API",
     "version": "1.0.0"
   },
   "openapi": "3.0.3",
   "paths": {
-    "/gw/environment": {
-      "get": {
-        "operationId": "getEnvironment",
+    "/gw/containers": {
+      "post": {
+        "operationId": "listContainers",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "properties": {
                   "host": {
-                    "default": "192.168.1.1",
                     "type": "string"
                   },
                   "user": {
-                    "default": "admin",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "List running Docker containers via SSH"
+      }
+    },
+    "/gw/disk/usage": {
+      "post": {
+        "operationId": "getDiskUsage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "host": {
+                    "type": "string"
+                  },
+                  "user": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Retrieve disk usage information via SSH"
+      }
+    },
+    "/gw/logs/{service_name}": {
+      "post": {
+        "operationId": "getServiceLogs",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "host": {
+                    "type": "string"
+                  },
+                  "user": {
                     "type": "string"
                   }
                 },
@@ -34,13 +134,7 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "fans_ok": {
-                      "type": "boolean"
-                    },
-                    "temperature_state": {
-                      "type": "string"
-                    },
-                    "temperature_value": {
+                    "output": {
                       "type": "string"
                     }
                   },
@@ -63,73 +157,21 @@
             "description": "Backend timeout"
           }
         },
-        "summary": "Retrieves environmental status including temperature and fan state."
+        "summary": "Retrieve journal logs for a specific service via SSH"
       }
     },
-    "/gw/interface/{name}/config": {
-      "get": {
-        "operationId": "getInterfaceConfig",
+    "/gw/memory/usage": {
+      "post": {
+        "operationId": "getMemoryUsage",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "properties": {
                   "host": {
-                    "default": "192.168.1.1",
                     "type": "string"
                   },
                   "user": {
-                    "default": "admin",
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "429": {
-            "description": "Rate limited"
-          },
-          "502": {
-            "description": "Backend error"
-          },
-          "503": {
-            "description": "Circuit breaker open"
-          },
-          "504": {
-            "description": "Backend timeout"
-          }
-        },
-        "summary": "Retrieves the running configuration for a specific interface."
-      }
-    },
-    "/gw/interfaces/status": {
-      "get": {
-        "operationId": "getInterfacesStatus",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "host": {
-                    "default": "192.168.1.1",
-                    "type": "string"
-                  },
-                  "user": {
-                    "default": "admin",
                     "type": "string"
                   }
                 },
@@ -145,9 +187,6 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": {
-                      "type": "string"
-                    },
                     "type": "object"
                   },
                   "type": "array"
@@ -169,23 +208,21 @@
             "description": "Backend timeout"
           }
         },
-        "summary": "Retrieves the status of all network interfaces."
+        "summary": "Retrieve memory usage information via SSH"
       }
     },
-    "/gw/ip-interface/brief": {
-      "get": {
-        "operationId": "getIpInterfaceBrief",
+    "/gw/ports": {
+      "post": {
+        "operationId": "listPorts",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "properties": {
                   "host": {
-                    "default": "192.168.1.1",
                     "type": "string"
                   },
                   "user": {
-                    "default": "admin",
                     "type": "string"
                   }
                 },
@@ -201,9 +238,6 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": {
-                      "type": "string"
-                    },
                     "type": "object"
                   },
                   "type": "array"
@@ -225,23 +259,21 @@
             "description": "Backend timeout"
           }
         },
-        "summary": "Retrieves brief IP interface configuration information."
+        "summary": "List listening network ports via SSH"
       }
     },
-    "/gw/mac-table/vlan/{vlan_id}": {
-      "get": {
-        "operationId": "getMacTableByVlan",
+    "/gw/systemctl/status/{service_name}": {
+      "post": {
+        "operationId": "getSystemctlStatus",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "properties": {
                   "host": {
-                    "default": "192.168.1.1",
                     "type": "string"
                   },
                   "user": {
-                    "default": "admin",
                     "type": "string"
                   }
                 },
@@ -256,13 +288,12 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "additionalProperties": {
+                  "properties": {
+                    "output": {
                       "type": "string"
-                    },
-                    "type": "object"
+                    }
                   },
-                  "type": "array"
+                  "type": "object"
                 }
               }
             },
@@ -281,23 +312,21 @@
             "description": "Backend timeout"
           }
         },
-        "summary": "Retrieves the MAC address table for a specific VLAN ID."
+        "summary": "Retrieve the status of a systemd service via SSH"
       }
     },
-    "/gw/vlan/brief": {
-      "get": {
-        "operationId": "getVlanBrief",
+    "/gw/top": {
+      "post": {
+        "operationId": "getTopProcesses",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "properties": {
                   "host": {
-                    "default": "192.168.1.1",
                     "type": "string"
                   },
                   "user": {
-                    "default": "admin",
                     "type": "string"
                   }
                 },
@@ -312,13 +341,12 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "additionalProperties": {
+                  "properties": {
+                    "output": {
                       "type": "string"
-                    },
-                    "type": "object"
+                    }
                   },
-                  "type": "array"
+                  "type": "object"
                 }
               }
             },
@@ -337,7 +365,7 @@
             "description": "Backend timeout"
           }
         },
-        "summary": "Retrieves brief VLAN configuration information."
+        "summary": "Retrieve top running processes via SSH"
       }
     }
   }

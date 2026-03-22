@@ -32,9 +32,18 @@ The code must compile with these dependencies (and ONLY these):
 - api_anything_plugin_sdk (provides: PluginInfo, PluginRequest, PluginResponse, export_plugin!)
 - serde, serde_json (for serialization, with "derive" feature)
 - reqwest (with "json" and "blocking" features, for HTTP calls)
-- quick-xml (with "serialize" feature, for XML parsing if needed)
+- quick-xml 0.37 (for XML parsing — see API notes below)
 - regex (for text parsing)
 - tracing (for observability)
+
+CRITICAL: quick-xml 0.37 API (DO NOT use deprecated methods):
+- For XML reading: use `Reader::from_str(xml)` with `reader.read_event()` (NOT read_event_into)
+- Event types: `Event::Start(e)`, `Event::End(e)`, `Event::Text(e)`, `Event::Empty(e)`, `Event::Eof`
+- Get tag name bytes: `e.name().as_ref()` (returns &[u8])
+- Get text content: `e.unescape().unwrap().to_string()` (NOT e.as_bytes(), NOT e.bytes())
+- Get attribute: `e.attributes().filter_map(|a| a.ok())` then `a.key.as_ref()` and `a.unescape_value().unwrap()`
+- For XML writing: just use format!() string building (simpler and more reliable than Writer)
+- DO NOT use: BytesText::as_bytes(), BytesText::bytes(), BytesText::escaped() — these do NOT exist in 0.37
 
 EXACT TYPE DEFINITIONS from api_anything_plugin_sdk (DO NOT deviate from these types):
 ```rust

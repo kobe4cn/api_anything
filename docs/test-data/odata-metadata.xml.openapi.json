@@ -5,7 +5,7 @@
   },
   "openapi": "3.0.3",
   "paths": {
-    "/gw/categories": {
+    "/gw/Categories": {
       "get": {
         "operationId": "listCategories",
         "responses": {
@@ -15,13 +15,13 @@
                 "schema": {
                   "items": {
                     "properties": {
-                      "description": {
+                      "Description": {
                         "type": "string"
                       },
-                      "id": {
+                      "Id": {
                         "type": "integer"
                       },
-                      "name": {
+                      "Name": {
                         "type": "string"
                       }
                     },
@@ -55,15 +55,15 @@
             "application/json": {
               "schema": {
                 "properties": {
-                  "description": {
+                  "Description": {
                     "type": "string"
                   },
-                  "name": {
+                  "Name": {
                     "type": "string"
                   }
                 },
                 "required": [
-                  "name"
+                  "Name"
                 ],
                 "type": "object"
               }
@@ -77,13 +77,13 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "description": {
+                    "Description": {
                       "type": "string"
                     },
-                    "id": {
+                    "Id": {
                       "type": "integer"
                     },
-                    "name": {
+                    "Name": {
                       "type": "string"
                     }
                   },
@@ -109,7 +109,33 @@
         "summary": "Create a new category"
       }
     },
-    "/gw/categories/{id}": {
+    "/gw/Categories/{id}": {
+      "delete": {
+        "operationId": "deleteCategory",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Delete a specific category"
+      },
       "get": {
         "operationId": "getCategory",
         "responses": {
@@ -118,14 +144,17 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "description": {
+                    "Description": {
                       "type": "string"
                     },
-                    "id": {
+                    "Id": {
                       "type": "integer"
                     },
-                    "name": {
+                    "Name": {
                       "type": "string"
+                    },
+                    "Products": {
+                      "type": "array"
                     }
                   },
                   "type": "object"
@@ -148,9 +177,66 @@
           }
         },
         "summary": "Retrieve a specific category by ID"
+      },
+      "put": {
+        "operationId": "updateCategory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "Description": {
+                    "type": "string"
+                  },
+                  "Name": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "Description": {
+                      "type": "string"
+                    },
+                    "Id": {
+                      "type": "integer"
+                    },
+                    "Name": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Update an existing category"
       }
     },
-    "/gw/orders": {
+    "/gw/Orders": {
       "get": {
         "operationId": "listOrders",
         "responses": {
@@ -160,19 +246,16 @@
                 "schema": {
                   "items": {
                     "properties": {
-                      "customer_name": {
+                      "CustomerName": {
                         "type": "string"
                       },
-                      "id": {
+                      "Id": {
                         "type": "string"
                       },
-                      "order_date": {
+                      "OrderDate": {
                         "type": "string"
                       },
-                      "shipping_address": {
-                        "type": "object"
-                      },
-                      "total_amount": {
+                      "TotalAmount": {
                         "type": "number"
                       }
                     },
@@ -206,23 +289,19 @@
             "application/json": {
               "schema": {
                 "properties": {
-                  "customer_name": {
+                  "CustomerName": {
                     "type": "string"
                   },
-                  "order_date": {
+                  "Items": {
+                    "type": "array"
+                  },
+                  "OrderDate": {
                     "type": "string"
-                  },
-                  "shipping_address": {
-                    "type": "object"
-                  },
-                  "total_amount": {
-                    "type": "number"
                   }
                 },
                 "required": [
-                  "customer_name",
-                  "total_amount",
-                  "order_date"
+                  "CustomerName",
+                  "OrderDate"
                 ],
                 "type": "object"
               }
@@ -236,16 +315,16 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "customer_name": {
+                    "CustomerName": {
                       "type": "string"
                     },
-                    "id": {
+                    "Id": {
                       "type": "string"
                     },
-                    "order_date": {
+                    "OrderDate": {
                       "type": "string"
                     },
-                    "total_amount": {
+                    "TotalAmount": {
                       "type": "number"
                     }
                   },
@@ -271,7 +350,33 @@
         "summary": "Create a new order"
       }
     },
-    "/gw/orders/{id}": {
+    "/gw/Orders/{id}": {
+      "delete": {
+        "operationId": "deleteOrder",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Delete a specific order"
+      },
       "get": {
         "operationId": "getOrder",
         "responses": {
@@ -280,19 +385,22 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "customer_name": {
+                    "CustomerName": {
                       "type": "string"
                     },
-                    "id": {
+                    "Id": {
                       "type": "string"
                     },
-                    "order_date": {
+                    "Items": {
+                      "type": "array"
+                    },
+                    "OrderDate": {
                       "type": "string"
                     },
-                    "shipping_address": {
+                    "ShippingAddress": {
                       "type": "object"
                     },
-                    "total_amount": {
+                    "TotalAmount": {
                       "type": "number"
                     }
                   },
@@ -316,9 +424,69 @@
           }
         },
         "summary": "Retrieve a specific order by ID"
+      },
+      "put": {
+        "operationId": "updateOrder",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "CustomerName": {
+                    "type": "string"
+                  },
+                  "TotalAmount": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "CustomerName": {
+                      "type": "string"
+                    },
+                    "Id": {
+                      "type": "string"
+                    },
+                    "OrderDate": {
+                      "type": "string"
+                    },
+                    "TotalAmount": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Update an existing order"
       }
     },
-    "/gw/products": {
+    "/gw/Products": {
       "get": {
         "operationId": "listProducts",
         "responses": {
@@ -328,31 +496,17 @@
                 "schema": {
                   "items": {
                     "properties": {
-                      "created_at": {
-                        "type": "string"
-                      },
-                      "id": {
+                      "Id": {
                         "type": "integer"
                       },
-                      "name": {
+                      "Name": {
                         "type": "string"
                       },
-                      "price": {
+                      "Price": {
                         "type": "number"
                       },
-                      "status": {
-                        "enum": [
-                          "Active",
-                          "Discontinued",
-                          "OutOfStock"
-                        ],
+                      "Status": {
                         "type": "string"
-                      },
-                      "tags": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "type": "array"
                       }
                     },
                     "type": "object"
@@ -385,34 +539,19 @@
             "application/json": {
               "schema": {
                 "properties": {
-                  "created_at": {
+                  "Name": {
                     "type": "string"
                   },
-                  "name": {
-                    "type": "string"
-                  },
-                  "price": {
+                  "Price": {
                     "type": "number"
                   },
-                  "status": {
-                    "enum": [
-                      "Active",
-                      "Discontinued",
-                      "OutOfStock"
-                    ],
+                  "Status": {
                     "type": "string"
-                  },
-                  "tags": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "type": "array"
                   }
                 },
                 "required": [
-                  "name",
-                  "price",
-                  "status"
+                  "Name",
+                  "Price"
                 ],
                 "type": "object"
               }
@@ -426,16 +565,16 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "id": {
+                    "Id": {
                       "type": "integer"
                     },
-                    "name": {
+                    "Name": {
                       "type": "string"
                     },
-                    "price": {
+                    "Price": {
                       "type": "number"
                     },
-                    "status": {
+                    "Status": {
                       "type": "string"
                     }
                   },
@@ -461,21 +600,14 @@
         "summary": "Create a new product"
       }
     },
-    "/gw/products/{id}": {
+    "/gw/Products/{id}": {
       "delete": {
         "operationId": "deleteProduct",
         "responses": {
           "200": {
             "content": {
               "application/json": {
-                "schema": {
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    }
-                  },
-                  "type": "object"
-                }
+                "schema": {}
               }
             },
             "description": "Success"
@@ -493,7 +625,7 @@
             "description": "Backend timeout"
           }
         },
-        "summary": "Delete a product by ID"
+        "summary": "Delete a specific product"
       },
       "get": {
         "operationId": "getProduct",
@@ -503,30 +635,28 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "created_at": {
+                    "Category": {
+                      "type": "object"
+                    },
+                    "CreatedAt": {
                       "type": "string"
                     },
-                    "id": {
+                    "Id": {
                       "type": "integer"
                     },
-                    "name": {
+                    "Name": {
                       "type": "string"
                     },
-                    "price": {
+                    "Price": {
                       "type": "number"
                     },
-                    "status": {
-                      "enum": [
-                        "Active",
-                        "Discontinued",
-                        "OutOfStock"
-                      ],
+                    "Status": {
                       "type": "string"
                     },
-                    "tags": {
-                      "items": {
-                        "type": "string"
-                      },
+                    "Supplier": {
+                      "type": "object"
+                    },
+                    "Tags": {
                       "type": "array"
                     }
                   },
@@ -551,75 +681,6 @@
         },
         "summary": "Retrieve a specific product by ID"
       },
-      "patch": {
-        "operationId": "patchProduct",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "price": {
-                    "type": "number"
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "tags": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "type": "array"
-                  }
-                },
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "id": {
-                      "type": "integer"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "price": {
-                      "type": "number"
-                    },
-                    "status": {
-                      "type": "string"
-                    }
-                  },
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Success"
-          },
-          "429": {
-            "description": "Rate limited"
-          },
-          "502": {
-            "description": "Backend error"
-          },
-          "503": {
-            "description": "Circuit breaker open"
-          },
-          "504": {
-            "description": "Backend timeout"
-          }
-        },
-        "summary": "Partially update an existing product"
-      },
       "put": {
         "operationId": "updateProduct",
         "requestBody": {
@@ -627,23 +688,14 @@
             "application/json": {
               "schema": {
                 "properties": {
-                  "created_at": {
+                  "Name": {
                     "type": "string"
                   },
-                  "name": {
-                    "type": "string"
-                  },
-                  "price": {
+                  "Price": {
                     "type": "number"
                   },
-                  "status": {
+                  "Status": {
                     "type": "string"
-                  },
-                  "tags": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "type": "array"
                   }
                 },
                 "type": "object"
@@ -658,16 +710,16 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "id": {
+                    "Id": {
                       "type": "integer"
                     },
-                    "name": {
+                    "Name": {
                       "type": "string"
                     },
-                    "price": {
+                    "Price": {
                       "type": "number"
                     },
-                    "status": {
+                    "Status": {
                       "type": "string"
                     }
                   },
@@ -690,10 +742,10 @@
             "description": "Backend timeout"
           }
         },
-        "summary": "Fully update an existing product"
+        "summary": "Update an existing product"
       }
     },
-    "/gw/suppliers": {
+    "/gw/Suppliers": {
       "get": {
         "operationId": "listSuppliers",
         "responses": {
@@ -703,16 +755,13 @@
                 "schema": {
                   "items": {
                     "properties": {
-                      "address": {
-                        "type": "object"
-                      },
-                      "contact_email": {
+                      "ContactEmail": {
                         "type": "string"
                       },
-                      "id": {
+                      "Id": {
                         "type": "integer"
                       },
-                      "name": {
+                      "Name": {
                         "type": "string"
                       }
                     },
@@ -746,18 +795,15 @@
             "application/json": {
               "schema": {
                 "properties": {
-                  "address": {
-                    "type": "object"
-                  },
-                  "contact_email": {
+                  "ContactEmail": {
                     "type": "string"
                   },
-                  "name": {
+                  "Name": {
                     "type": "string"
                   }
                 },
                 "required": [
-                  "name"
+                  "Name"
                 ],
                 "type": "object"
               }
@@ -771,13 +817,13 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "contact_email": {
+                    "ContactEmail": {
                       "type": "string"
                     },
-                    "id": {
+                    "Id": {
                       "type": "integer"
                     },
-                    "name": {
+                    "Name": {
                       "type": "string"
                     }
                   },
@@ -803,7 +849,33 @@
         "summary": "Create a new supplier"
       }
     },
-    "/gw/suppliers/{id}": {
+    "/gw/Suppliers/{id}": {
+      "delete": {
+        "operationId": "deleteSupplier",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Delete a specific supplier"
+      },
       "get": {
         "operationId": "getSupplier",
         "responses": {
@@ -812,17 +884,20 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "address": {
+                    "Address": {
                       "type": "object"
                     },
-                    "contact_email": {
+                    "ContactEmail": {
                       "type": "string"
                     },
-                    "id": {
+                    "Id": {
                       "type": "integer"
                     },
-                    "name": {
+                    "Name": {
                       "type": "string"
+                    },
+                    "Products": {
+                      "type": "array"
                     }
                   },
                   "type": "object"
@@ -845,6 +920,63 @@
           }
         },
         "summary": "Retrieve a specific supplier by ID"
+      },
+      "put": {
+        "operationId": "updateSupplier",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "ContactEmail": {
+                    "type": "string"
+                  },
+                  "Name": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "ContactEmail": {
+                      "type": "string"
+                    },
+                    "Id": {
+                      "type": "integer"
+                    },
+                    "Name": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Update an existing supplier"
       }
     }
   }

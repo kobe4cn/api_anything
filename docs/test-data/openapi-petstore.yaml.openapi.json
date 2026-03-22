@@ -158,7 +158,7 @@
             "description": "Backend timeout"
           }
         },
-        "summary": "Create a new pet"
+        "summary": "Create a new pet in the store"
       }
     },
     "/gw/pets/{id}": {
@@ -196,7 +196,7 @@
         "summary": "Delete a pet by ID"
       },
       "get": {
-        "operationId": "getPetById",
+        "operationId": "getPet",
         "responses": {
           "200": {
             "content": {
@@ -327,7 +327,7 @@
     },
     "/gw/pets/{id}/vaccinations": {
       "get": {
-        "operationId": "getPetVaccinations",
+        "operationId": "getVaccinations",
         "responses": {
           "200": {
             "content": {
@@ -375,7 +375,7 @@
         "summary": "Get all vaccinations for a pet"
       },
       "post": {
-        "operationId": "addVaccination",
+        "operationId": "createVaccination",
         "requestBody": {
           "content": {
             "application/json": {
