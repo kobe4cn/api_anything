@@ -99,6 +99,7 @@ async fn e2e_wsdl_generate_load_and_proxy() {
         &repo,
         project.id,
         &wsdl,
+        None,
     )
     .await
     .unwrap();

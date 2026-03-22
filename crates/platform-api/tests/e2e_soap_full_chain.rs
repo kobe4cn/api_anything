@@ -133,7 +133,7 @@ async fn setup_soap_env(
         .await
         .unwrap();
 
-    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, wsdl)
+    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, wsdl, None)
         .await
         .unwrap();
 
@@ -436,7 +436,7 @@ async fn soap_backend_timeout_returns_504() {
         .await
         .unwrap();
 
-    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &wsdl)
+    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &wsdl, None)
         .await
         .unwrap();
 

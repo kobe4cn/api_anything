@@ -43,7 +43,7 @@ async fn server_with_routes() -> (TestServer, Uuid, sqlx::PgPool) {
         "CalculatorService",
         &format!("DocsComp{}Service", &suffix.to_string()[..8]),
     );
-    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &wsdl)
+    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &wsdl, None)
         .await
         .unwrap();
 
@@ -215,7 +215,7 @@ async fn docs_openapi_updates_on_new_routes() {
         "CalculatorService",
         &format!("DocsUpdate{}Service", &suffix.to_string()[..8]),
     );
-    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &wsdl)
+    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &wsdl, None)
         .await
         .unwrap();
 

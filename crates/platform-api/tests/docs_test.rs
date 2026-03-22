@@ -51,7 +51,7 @@ async fn openapi_includes_gateway_routes() {
             "CalculatorService",
             &format!("DocTest{}Service", &suffix.to_string()[..8]),
         );
-    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &wsdl)
+    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &wsdl, None)
         .await
         .unwrap();
 
@@ -116,7 +116,7 @@ async fn agent_prompt_includes_routes() {
         "CalculatorService",
         &format!("PromptTest{}Service", &suffix.to_string()[..8]),
     );
-    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &wsdl)
+    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &wsdl, None)
         .await
         .unwrap();
 

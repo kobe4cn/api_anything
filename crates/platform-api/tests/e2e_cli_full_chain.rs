@@ -98,6 +98,7 @@ async fn setup_cli_env(
         program_path,
         main_help,
         sub_helps,
+        None,
     )
     .await
     .unwrap();
@@ -225,6 +226,7 @@ async fn cli_raw_text_output() {
         &script,
         sample_main_help(),
         &[("generate", sample_sub_help())],
+        None,
     )
     .await
     .unwrap();
@@ -294,6 +296,7 @@ async fn cli_command_failure_returns_502() {
         &script,
         sample_main_help(),
         &[("generate", sample_sub_help())],
+        None,
     )
     .await
     .unwrap();
@@ -364,6 +367,7 @@ async fn cli_nonexistent_program_returns_502() {
         &nonexistent,
         sample_main_help(),
         &[("generate", sample_sub_help())],
+        None,
     )
     .await
     .unwrap();
@@ -421,6 +425,7 @@ async fn cli_command_injection_prevention() {
         &echo_path,
         sample_main_help(),
         &[("generate", sample_sub_help())],
+        None,
     )
     .await
     .unwrap();
@@ -488,6 +493,7 @@ async fn cli_command_injection_variants() {
         &echo_path,
         sample_main_help(),
         &[("generate", sample_sub_help())],
+        None,
     )
     .await
     .unwrap();
@@ -567,6 +573,7 @@ async fn cli_boolean_flag_handling() {
         &echo_path,
         sample_main_help(),
         &[("generate", sample_sub_help())],
+        None,
     )
     .await
     .unwrap();
@@ -639,6 +646,7 @@ async fn cli_numeric_parameter() {
         &echo_path,
         sample_main_help(),
         &[("generate", sample_sub_help())],
+        None,
     )
     .await
     .unwrap();
@@ -712,6 +720,7 @@ async fn cli_http_method_inference() {
         &script,
         sample_main_help(),
         &[("generate", sample_sub_help())],
+        None,
     )
     .await
     .unwrap();

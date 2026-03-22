@@ -57,6 +57,7 @@ async fn e2e_cli_generate_load_and_proxy() {
         &script_path,
         main_help,
         &[("generate", sub_help)],
+        None,
     )
     .await
     .unwrap();

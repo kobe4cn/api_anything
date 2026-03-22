@@ -106,7 +106,7 @@ async fn scenario_a_soap_full_lifecycle() {
 
     // 3. 运行 WSDL 生成流水线
     let gen_result =
-        api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &wsdl)
+        api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &wsdl, None)
             .await
             .unwrap();
     assert_eq!(
@@ -276,6 +276,7 @@ async fn scenario_b_cli_full_lifecycle() {
         link_path.to_str().unwrap(),
         main_help,
         &[("generate", sub_help)],
+        None,
     )
     .await
     .unwrap();
@@ -400,7 +401,7 @@ async fn scenario_c_compensation_full_chain() {
         .await
         .unwrap();
 
-    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &wsdl)
+    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &wsdl, None)
         .await
         .unwrap();
 
@@ -754,7 +755,7 @@ async fn scenario_e_multi_protocol_coexistence() {
         )
         .await
         .unwrap();
-    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, soap_project.id, &wsdl)
+    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, soap_project.id, &wsdl, None)
         .await
         .unwrap();
 
@@ -784,6 +785,7 @@ async fn scenario_e_multi_protocol_coexistence() {
         link_path.to_str().unwrap(),
         main_help,
         &[("generate", sub_help)],
+        None,
     )
     .await
     .unwrap();
@@ -803,6 +805,7 @@ async fn scenario_e_multi_protocol_coexistence() {
         &repo,
         ssh_project.id,
         ssh_sample,
+        None,
     )
     .await
     .unwrap();
@@ -911,7 +914,7 @@ async fn scenario_f_sandbox_mode_transitions() {
         )
         .await
         .unwrap();
-    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &wsdl)
+    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &wsdl, None)
         .await
         .unwrap();
 

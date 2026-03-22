@@ -28,7 +28,7 @@ async fn pipeline_creates_correct_number_of_routes() {
         .await
         .unwrap();
 
-    let result = GenerationPipeline::run_wsdl(&repo, project.id, sample_wsdl())
+    let result = GenerationPipeline::run_wsdl(&repo, project.id, sample_wsdl(), None)
         .await
         .unwrap();
 
@@ -49,7 +49,7 @@ async fn pipeline_generates_valid_openapi_spec() {
         .await
         .unwrap();
 
-    let result = GenerationPipeline::run_wsdl(&repo, project.id, sample_wsdl())
+    let result = GenerationPipeline::run_wsdl(&repo, project.id, sample_wsdl(), None)
         .await
         .unwrap();
 
@@ -79,7 +79,7 @@ async fn pipeline_persists_routes_to_database() {
         .await
         .unwrap();
 
-    let result = GenerationPipeline::run_wsdl(&repo, project.id, sample_wsdl())
+    let result = GenerationPipeline::run_wsdl(&repo, project.id, sample_wsdl(), None)
         .await
         .unwrap();
 
@@ -113,7 +113,7 @@ async fn pipeline_produces_zero_routes_on_empty_wsdl() {
         .await
         .unwrap();
 
-    let result = GenerationPipeline::run_wsdl(&repo, project.id, "<definitions/>").await.unwrap();
+    let result = GenerationPipeline::run_wsdl(&repo, project.id, "<definitions/>", None).await.unwrap();
     assert_eq!(result.routes_count, 0, "Empty WSDL should produce zero routes");
 
     // 清理

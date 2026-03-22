@@ -70,7 +70,7 @@ pub async fn setup_full_env(wsdl: &str, service_name_suffix: &str) -> (TestServe
         .await
         .unwrap();
 
-    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &unique_wsdl)
+    api_anything_generator::pipeline::GenerationPipeline::run_wsdl(&repo, project.id, &unique_wsdl, None)
         .await
         .unwrap();
 

@@ -1,8 +1,10 @@
-use crate::wsdl::{parser::WsdlParser, mapper::WsdlMapper, llm_mapper::LlmEnhancedMapper};
-use crate::cli_help::{parser::CliHelpParser, mapper::CliMapper};
-use crate::ssh_sample::{parser::SshSampleParser, mapper::SshMapper};
+use crate::cli_help::mapper::CliMapper;
+use crate::cli_help::parser::CliHelpParser;
 use crate::llm::client::LlmClient;
 use crate::openapi::OpenApiGenerator;
+use crate::ssh_sample::mapper::SshMapper;
+use crate::ssh_sample::parser::SshSampleParser;
+use crate::wsdl::{llm_mapper::LlmEnhancedMapper, mapper::WsdlMapper, parser::WsdlParser};
 use api_anything_common::models::*;
 use api_anything_metadata::MetadataRepo;
 use serde_json::Value;
@@ -18,27 +20,38 @@ pub struct GenerationResult {
 }
 
 impl GenerationPipeline {
+    /// WSDL 生成管道，接受可选的 LLM 客户端。
+    /// 有 LLM 时使用 LlmEnhancedMapper 优化 HTTP 方法和路径设计，
+    /// 无 LLM 时回退到确定性映射，保证功能完整。
     pub async fn run_wsdl(
         repo: &impl MetadataRepo,
         project_id: Uuid,
         wsdl_content: &str,
+        llm: Option<&dyn LlmClient>,
     ) -> Result<GenerationResult, anyhow::Error> {
         // Stage 1: 解析 WSDL 文档，提取服务结构、消息定义和操作列表
         tracing::info!("Stage 1: Parsing WSDL");
         let wsdl = WsdlParser::parse(wsdl_content)?;
 
-        // Stage 2: 将 WSDL 结构映射为统一合约中间表示，屏蔽 SOAP 特有细节
-        tracing::info!("Stage 2: Mapping to UnifiedContract");
-        let contract = WsdlMapper::map(&wsdl)?;
+        // Stage 2: 根据 LLM 可用性选择映射策略
+        let contract = if let Some(llm_client) = llm {
+            tracing::info!("Stage 2: LLM-enhanced mapping to UnifiedContract");
+            LlmEnhancedMapper::map(&wsdl, llm_client).await?
+        } else {
+            tracing::info!("Stage 2: Deterministic mapping to UnifiedContract");
+            WsdlMapper::map(&wsdl)?
+        };
 
         // Stage 3: 持久化合约，保存原始 schema 以便后续审计或重新解析
         tracing::info!("Stage 3: Persisting to metadata");
-        let db_contract = repo.create_contract(
-            project_id,
-            "1.0.0",
-            wsdl_content,
-            &serde_json::to_value(&contract)?,
-        ).await?;
+        let db_contract = repo
+            .create_contract(
+                project_id,
+                "1.0.0",
+                wsdl_content,
+                &serde_json::to_value(&contract)?,
+            )
+            .await?;
 
         // Stage 4: 为每个操作创建后端绑定和路由记录，
         // 后端绑定携带 SOAP 转发所需的 endpoint_url、soapAction 等运行时参数
@@ -51,11 +64,9 @@ impl GenerationPipeline {
                 "namespace": wsdl.target_namespace,
             });
 
-            let binding = repo.create_backend_binding(
-                ProtocolType::Soap,
-                &endpoint_config,
-                30000,
-            ).await?;
+            let binding = repo
+                .create_backend_binding(ProtocolType::Soap, &endpoint_config, 30000)
+                .await?;
 
             // SOAP 操作固定为 POST，此处 match 保留扩展性，
             // 方便将来支持 REST-style WSDL（如 HTTP binding）
@@ -67,10 +78,14 @@ impl GenerationPipeline {
                 _ => HttpMethod::Post,
             };
 
-            let request_schema = op.input.as_ref()
+            let request_schema = op
+                .input
+                .as_ref()
                 .map(|m| m.schema.clone())
                 .unwrap_or(serde_json::json!({}));
-            let response_schema = op.output.as_ref()
+            let response_schema = op
+                .output
+                .as_ref()
                 .map(|m| m.schema.clone())
                 .unwrap_or(serde_json::json!({}));
 
@@ -82,7 +97,8 @@ impl GenerationPipeline {
                 &response_schema,
                 &endpoint_config,
                 binding.id,
-            ).await?;
+            )
+            .await?;
             routes_count += 1;
         }
 
@@ -99,12 +115,14 @@ impl GenerationPipeline {
 
     /// CLI 管道：解析主帮助文本和各子命令帮助，映射为统一合约后走相同的持久化和 OpenAPI 生成流程。
     /// subcommand_helps 允许调用方按需传入子命令的详细帮助，未传入的子命令 options 列表保持为空。
+    /// llm 参数为可选 LLM 客户端，当前保留为将来 CLI LLM 增强做入口。
     pub async fn run_cli(
         repo: &impl MetadataRepo,
         project_id: Uuid,
         program_name: &str,
         main_help: &str,
         subcommand_helps: &[(&str, &str)], // (name, help_text)
+        _llm: Option<&dyn LlmClient>,
     ) -> Result<GenerationResult, anyhow::Error> {
         // Stage 1: 解析主帮助文本，获取程序名、子命令列表和全局选项
         tracing::info!("Stage 1: Parsing CLI help");
@@ -125,12 +143,14 @@ impl GenerationPipeline {
 
         // Stage 3: 持久化合约，原始 schema 存主帮助文本，便于后续审计
         tracing::info!("Stage 3: Persisting to metadata");
-        let db_contract = repo.create_contract(
-            project_id,
-            "1.0.0",
-            main_help,
-            &serde_json::to_value(&contract)?,
-        ).await?;
+        let db_contract = repo
+            .create_contract(
+                project_id,
+                "1.0.0",
+                main_help,
+                &serde_json::to_value(&contract)?,
+            )
+            .await?;
 
         // Stage 4: 为每个子命令创建 CLI 协议绑定和路由记录。
         // endpoint_config 携带运行时执行命令所需的 program、subcommand 和 output_format，
@@ -143,11 +163,9 @@ impl GenerationPipeline {
                 "output_format": "json",
             });
 
-            let binding = repo.create_backend_binding(
-                ProtocolType::Cli,
-                &endpoint_config,
-                30000,
-            ).await?;
+            let binding = repo
+                .create_backend_binding(ProtocolType::Cli, &endpoint_config, 30000)
+                .await?;
 
             let method = match op.http_method.as_str() {
                 "GET" => HttpMethod::Get,
@@ -157,10 +175,14 @@ impl GenerationPipeline {
                 _ => HttpMethod::Post,
             };
 
-            let request_schema = op.input.as_ref()
+            let request_schema = op
+                .input
+                .as_ref()
                 .map(|m| m.schema.clone())
                 .unwrap_or(serde_json::json!({}));
-            let response_schema = op.output.as_ref()
+            let response_schema = op
+                .output
+                .as_ref()
                 .map(|m| m.schema.clone())
                 .unwrap_or(serde_json::json!({}));
 
@@ -172,87 +194,8 @@ impl GenerationPipeline {
                 &response_schema,
                 &endpoint_config,
                 binding.id,
-            ).await?;
-            routes_count += 1;
-        }
-
-        // Stage 5: 生成 OpenAPI 规范
-        tracing::info!("Stage 5: Generating OpenAPI spec");
-        let openapi = OpenApiGenerator::generate(&contract);
-
-        Ok(GenerationResult {
-            contract_id: db_contract.id,
-            routes_count,
-            openapi_spec: openapi,
-        })
-    }
-
-    /// 与 run_wsdl 流程相同，但 Stage 2 使用 LLM 增强映射器优化 HTTP 方法和路径。
-    /// 若 LLM 不可用，LlmEnhancedMapper 内部会自动降级到确定性映射，保证流程不中断。
-    pub async fn run_wsdl_with_llm(
-        repo: &impl MetadataRepo,
-        project_id: Uuid,
-        wsdl_content: &str,
-        llm: &dyn LlmClient,
-    ) -> Result<GenerationResult, anyhow::Error> {
-        // Stage 1: 解析 WSDL 文档
-        tracing::info!("Stage 1: Parsing WSDL");
-        let wsdl = WsdlParser::parse(wsdl_content)?;
-
-        // Stage 2: LLM 增强映射，相比 run_wsdl 的确定性映射，
-        // 此处尝试让 LLM 优化 HTTP 方法语义和路径命名风格
-        tracing::info!("Stage 2: LLM-enhanced mapping to UnifiedContract");
-        let contract = LlmEnhancedMapper::map(&wsdl, llm).await?;
-
-        // Stage 3: 持久化合约
-        tracing::info!("Stage 3: Persisting to metadata");
-        let db_contract = repo.create_contract(
-            project_id,
-            "1.0.0",
-            wsdl_content,
-            &serde_json::to_value(&contract)?,
-        ).await?;
-
-        // Stage 4: 创建后端绑定和路由记录
-        let mut routes_count = 0;
-        for op in &contract.operations {
-            let endpoint_config = serde_json::json!({
-                "url": op.endpoint_url,
-                "soap_action": op.soap_action,
-                "operation_name": op.name,
-                "namespace": wsdl.target_namespace,
-            });
-
-            let binding = repo.create_backend_binding(
-                ProtocolType::Soap,
-                &endpoint_config,
-                30000,
-            ).await?;
-
-            let method = match op.http_method.as_str() {
-                "GET" => HttpMethod::Get,
-                "PUT" => HttpMethod::Put,
-                "DELETE" => HttpMethod::Delete,
-                "PATCH" => HttpMethod::Patch,
-                _ => HttpMethod::Post,
-            };
-
-            let request_schema = op.input.as_ref()
-                .map(|m| m.schema.clone())
-                .unwrap_or(serde_json::json!({}));
-            let response_schema = op.output.as_ref()
-                .map(|m| m.schema.clone())
-                .unwrap_or(serde_json::json!({}));
-
-            repo.create_route(
-                db_contract.id,
-                method,
-                &op.path,
-                &request_schema,
-                &response_schema,
-                &endpoint_config,
-                binding.id,
-            ).await?;
+            )
+            .await?;
             routes_count += 1;
         }
 
@@ -269,10 +212,12 @@ impl GenerationPipeline {
 
     /// SSH 样本管道：解析 SSH 交互样本文本，映射为统一合约，持久化后生成 OpenAPI 规范。
     /// 流程结构与 run_wsdl / run_cli 保持一致，仅 Stage 1-2 使用 SSH 专属解析器和映射器。
+    /// llm 参数为可选 LLM 客户端，当前保留为将来 SSH LLM 增强做入口。
     pub async fn run_ssh(
         repo: &impl MetadataRepo,
         project_id: Uuid,
         sample_text: &str,
+        _llm: Option<&dyn LlmClient>,
     ) -> Result<GenerationResult, anyhow::Error> {
         // Stage 1: 解析 SSH 交互样本，提取 host、user 和命令列表
         tracing::info!("Stage 1: Parsing SSH sample");
@@ -284,12 +229,14 @@ impl GenerationPipeline {
 
         // Stage 3: 持久化合约，原始样本文本保留以便后续审计
         tracing::info!("Stage 3: Persisting to metadata");
-        let db_contract = repo.create_contract(
-            project_id,
-            "1.0.0",
-            sample_text,
-            &serde_json::to_value(&contract)?,
-        ).await?;
+        let db_contract = repo
+            .create_contract(
+                project_id,
+                "1.0.0",
+                sample_text,
+                &serde_json::to_value(&contract)?,
+            )
+            .await?;
 
         // Stage 4: 为每个 SSH 命令创建后端绑定和路由记录。
         // endpoint_config 携带 SSH 连接参数（host、user、command_template、output_format），
@@ -303,11 +250,9 @@ impl GenerationPipeline {
                 "output_format": cmd.output_format,
             });
 
-            let binding = repo.create_backend_binding(
-                ProtocolType::Ssh,
-                &endpoint_config,
-                30000,
-            ).await?;
+            let binding = repo
+                .create_backend_binding(ProtocolType::Ssh, &endpoint_config, 30000)
+                .await?;
 
             let method = match op.http_method.as_str() {
                 "GET" => HttpMethod::Get,
@@ -317,10 +262,14 @@ impl GenerationPipeline {
                 _ => HttpMethod::Post,
             };
 
-            let request_schema = op.input.as_ref()
+            let request_schema = op
+                .input
+                .as_ref()
                 .map(|m| m.schema.clone())
                 .unwrap_or(serde_json::json!({}));
-            let response_schema = op.output.as_ref()
+            let response_schema = op
+                .output
+                .as_ref()
                 .map(|m| m.schema.clone())
                 .unwrap_or(serde_json::json!({}));
 
@@ -332,7 +281,8 @@ impl GenerationPipeline {
                 &response_schema,
                 &endpoint_config,
                 binding.id,
-            ).await?;
+            )
+            .await?;
             routes_count += 1;
         }
 
