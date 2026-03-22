@@ -255,6 +255,110 @@ impl MetadataRepo for PgMetadataRepo {
         Ok(())
     }
 
+    async fn record_interaction(
+        &self,
+        session_id: Uuid,
+        route_id: Uuid,
+        request: &Value,
+        response: &Value,
+        duration_ms: i32,
+    ) -> Result<RecordedInteraction, AppError> {
+        let interaction = sqlx::query_as::<_, RecordedInteraction>(
+            r#"
+            INSERT INTO recorded_interactions (session_id, route_id, request, response, duration_ms)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id, session_id, route_id, request, response, duration_ms, recorded_at
+            "#,
+        )
+        .bind(session_id)
+        .bind(route_id)
+        .bind(request)
+        .bind(response)
+        .bind(duration_ms)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(interaction)
+    }
+
+    async fn find_matching_interaction(
+        &self,
+        session_id: Uuid,
+        route_id: Uuid,
+        request: &Value,
+    ) -> Result<Option<RecordedInteraction>, AppError> {
+        // 精确匹配优先：请求 JSON 完全相等时直接返回，避免进入开销较高的模糊匹配
+        let exact = sqlx::query_as::<_, RecordedInteraction>(
+            r#"
+            SELECT id, session_id, route_id, request, response, duration_ms, recorded_at
+            FROM recorded_interactions
+            WHERE session_id = $1 AND route_id = $2 AND request = $3
+            LIMIT 1
+            "#,
+        )
+        .bind(session_id)
+        .bind(route_id)
+        .bind(request)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        if exact.is_some() {
+            return Ok(exact);
+        }
+
+        // 模糊匹配：当请求体字段有细微差异时，按共同顶层 key 数量选出最相似录音；
+        // 相同 key 数量时取最新录制，保证回放优先使用更接近当前业务语义的录音
+        let candidates = sqlx::query_as::<_, RecordedInteraction>(
+            r#"
+            SELECT id, session_id, route_id, request, response, duration_ms, recorded_at
+            FROM recorded_interactions
+            WHERE session_id = $1 AND route_id = $2
+            ORDER BY recorded_at DESC
+            "#,
+        )
+        .bind(session_id)
+        .bind(route_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        if candidates.is_empty() {
+            return Ok(None);
+        }
+
+        let request_keys: std::collections::HashSet<&str> = request
+            .as_object()
+            .map(|o| o.keys().map(|k| k.as_str()).collect())
+            .unwrap_or_default();
+
+        let best = candidates.into_iter().max_by_key(|interaction| {
+            // 计算录音请求与当前请求共同的顶层 key 数量作为相似度分数
+            interaction
+                .request
+                .as_object()
+                .map(|o| o.keys().filter(|k| request_keys.contains(k.as_str())).count())
+                .unwrap_or(0)
+        });
+
+        Ok(best)
+    }
+
+    async fn list_recorded_interactions(
+        &self,
+        session_id: Uuid,
+    ) -> Result<Vec<RecordedInteraction>, AppError> {
+        let interactions = sqlx::query_as::<_, RecordedInteraction>(
+            r#"
+            SELECT id, session_id, route_id, request, response, duration_ms, recorded_at
+            FROM recorded_interactions
+            WHERE session_id = $1
+            ORDER BY recorded_at DESC
+            "#,
+        )
+        .bind(session_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(interactions)
+    }
+
     async fn list_active_routes_with_bindings(&self) -> Result<Vec<RouteWithBinding>, AppError> {
         // 使用运行时查询而非宏，避免编译时对 enum 联合类型注解的复杂依赖
         // JOIN 查询确保只返回已配置后端绑定的路由，孤立路由不会出现在路由表中

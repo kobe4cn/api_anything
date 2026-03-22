@@ -350,7 +350,7 @@ mod tests {
             unimplemented!()
         }
 
-        // MockRepo 仅用于网关路由加载的单元测试，沙箱会话方法不在测试范围内
+        // MockRepo 仅用于网关路由加载的单元测试，沙箱及录音方法不在测试范围内
         async fn create_sandbox_session(
             &self,
             _project_id: Uuid,
@@ -368,6 +368,30 @@ mod tests {
             unimplemented!()
         }
         async fn delete_sandbox_session(&self, _id: Uuid) -> Result<(), AppError> {
+            unimplemented!()
+        }
+        async fn record_interaction(
+            &self,
+            _session_id: Uuid,
+            _route_id: Uuid,
+            _request: &serde_json::Value,
+            _response: &serde_json::Value,
+            _duration_ms: i32,
+        ) -> Result<RecordedInteraction, AppError> {
+            unimplemented!()
+        }
+        async fn find_matching_interaction(
+            &self,
+            _session_id: Uuid,
+            _route_id: Uuid,
+            _request: &serde_json::Value,
+        ) -> Result<Option<RecordedInteraction>, AppError> {
+            unimplemented!()
+        }
+        async fn list_recorded_interactions(
+            &self,
+            _session_id: Uuid,
+        ) -> Result<Vec<RecordedInteraction>, AppError> {
             unimplemented!()
         }
     }

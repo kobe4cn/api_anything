@@ -58,4 +58,29 @@ pub trait MetadataRepo: Send + Sync {
     async fn list_sandbox_sessions(&self, project_id: Uuid) -> Result<Vec<SandboxSession>, AppError>;
 
     async fn delete_sandbox_session(&self, id: Uuid) -> Result<(), AppError>;
+
+    /// 将一次请求/响应交互写入 recorded_interactions 表，供 replay 模式重放使用
+    async fn record_interaction(
+        &self,
+        session_id: Uuid,
+        route_id: Uuid,
+        request: &Value,
+        response: &Value,
+        duration_ms: i32,
+    ) -> Result<RecordedInteraction, AppError>;
+
+    /// 先尝试精确匹配请求 JSON，若无精确命中则按顶层 key 数量取最相似记录；
+    /// 模糊回退确保录制时请求字段略有差异也能复用已有录音，减少用户手动维护成本
+    async fn find_matching_interaction(
+        &self,
+        session_id: Uuid,
+        route_id: Uuid,
+        request: &Value,
+    ) -> Result<Option<RecordedInteraction>, AppError>;
+
+    /// 返回指定会话的所有录音，按录制时间倒序，供调试和审计用
+    async fn list_recorded_interactions(
+        &self,
+        session_id: Uuid,
+    ) -> Result<Vec<RecordedInteraction>, AppError>;
 }

@@ -13,8 +13,11 @@ uuid.workspace = true
 chrono.workspace = true
 tracing.workspace = true
 thiserror.workspace = true
+anyhow.workspace = true
 rand.workspace = true
 axum.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true
+sqlx.workspace = true
+dotenvy = "0.15"

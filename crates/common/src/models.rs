@@ -203,7 +203,7 @@ pub struct SandboxSession {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct RecordedInteraction {
     pub id: Uuid,
     pub session_id: Uuid,
