@@ -15,6 +15,7 @@
 5. [补偿机制测试用例](#5-补偿机制测试用例)
 6. [前端 Web 测试用例](#6-前端-web-测试用例)
 7. [前端测试截图说明](#7-前端测试截图说明)
+8. [Phase 6 功能测试用例](#8-phase-6-功能测试用例)
 
 ---
 
@@ -688,3 +689,94 @@ curl -v -X POST http://localhost:8080/api/v1/compensation/dead-letters/{id}/reso
 | `crates/generator/tests/fixtures/ssh_sample.txt` | SSH Sample | 简单交换机命令（3 命令） |
 | `docs/test-data/network-switch-ssh.txt` | SSH Sample | Cisco 9300 交换机（6 命令） |
 | `docs/test-data/server-management-ssh.txt` | SSH Sample | Linux 服务器运维（7 命令） |
+
+---
+
+## 8. Phase 6 功能测试用例
+
+### 8.1 Webhook 管理测试
+
+| 编号 | 用例名称 | 请求方法/路径 | 预期状态码 | 验证要点 |
+|------|---------|--------------|-----------|---------|
+| WH-001 | 创建 Webhook 订阅 | `POST /api/v1/webhooks` `{"url":"https://example.com/hook","event_types":["DeadLetter"],"description":"test"}` | 201 | 返回完整 Webhook 对象，含 `id`、`url`、`event_types` |
+| WH-002 | 列出订阅 | `GET /api/v1/webhooks` | 200 | 返回 JSON 数组，包含已创建的订阅 |
+| WH-003 | 删除订阅 | `DELETE /api/v1/webhooks/{id}` | 204 | 无响应体；再次 GET 列表应不含该订阅 |
+
+**cURL 示例**:
+
+```bash
+# WH-001: 创建订阅
+curl -v -X POST http://localhost:8080/api/v1/webhooks \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com/hook","event_types":["DeadLetter","DeliveryFailed"],"description":"告警通知"}'
+
+# WH-002: 列出订阅
+curl -s http://localhost:8080/api/v1/webhooks | jq .
+
+# WH-003: 删除订阅
+curl -v -X DELETE http://localhost:8080/api/v1/webhooks/{id}
+```
+
+### 8.2 SDK 生成测试
+
+| 编号 | 用例名称 | 请求方法/路径 | 预期状态码 | 验证要点 |
+|------|---------|--------------|-----------|---------|
+| SDK-001 | TypeScript SDK | `GET /api/v1/docs/sdk/typescript` | 200 | 响应体包含 `fetch` 关键字 |
+| SDK-002 | Python SDK | `GET /api/v1/docs/sdk/python` | 200 | 响应体包含 `requests` 关键字 |
+| SDK-003 | 不支持的语言 | `GET /api/v1/docs/sdk/cobol` | 400 | 错误响应，提示不支持的语言 |
+
+**cURL 示例**:
+
+```bash
+# SDK-001: TypeScript SDK
+curl -s http://localhost:8080/api/v1/docs/sdk/typescript | head -20
+
+# SDK-002: Python SDK
+curl -s http://localhost:8080/api/v1/docs/sdk/python | head -20
+
+# SDK-003: 不支持的语言
+curl -v http://localhost:8080/api/v1/docs/sdk/cobol
+```
+
+### 8.3 录制管理测试
+
+| 编号 | 用例名称 | 请求方法/路径 | 预期状态码 | 验证要点 |
+|------|---------|--------------|-----------|---------|
+| REC-001 | 查看录制 | `GET /api/v1/sandbox-sessions/{id}/recordings` | 200 | 返回 JSON 数组，每条含请求和响应数据 |
+| REC-002 | 清空录制 | `DELETE /api/v1/sandbox-sessions/{id}/recordings` | 204 | 无响应体；再次 GET 应返回空数组 |
+
+**cURL 示例**:
+
+```bash
+# REC-001: 查看录制
+curl -s http://localhost:8080/api/v1/sandbox-sessions/{session_id}/recordings | jq .
+
+# REC-002: 清空录制
+curl -v -X DELETE http://localhost:8080/api/v1/sandbox-sessions/{session_id}/recordings
+```
+
+### 8.4 插件管理测试
+
+| 编号 | 用例名称 | 请求方法/路径 | 预期状态码 | 验证要点 |
+|------|---------|--------------|-----------|---------|
+| PLG-001 | 列出插件 | `GET /api/v1/plugins` | 200 | 返回 JSON 数组，含已加载插件列表 |
+| PLG-002 | 扫描插件 | `POST /api/v1/plugins/scan` | 200 | 返回扫描结果，含发现和加载的插件数量 |
+
+**cURL 示例**:
+
+```bash
+# PLG-001: 列出插件
+curl -s http://localhost:8080/api/v1/plugins | jq .
+
+# PLG-002: 扫描插件目录
+curl -v -X POST http://localhost:8080/api/v1/plugins/scan
+```
+
+### 8.5 前端新页面测试
+
+| 编号 | 用例名称 | 操作步骤 | 预期结果 | 验证要点 |
+|------|---------|---------|---------|---------|
+| WEB-014 | API Explorer 加载 | 浏览器访问 `/explorer` | 显示路由列表和请求构建器 | 左侧显示按项目分组的路由列表；右侧显示请求面板 |
+| WEB-015 | Webhook Manager | 浏览器访问 `/webhooks` | 显示订阅表格 | 表格包含 URL、Event Types、Description、Actions 列 |
+| WEB-016 | SDK Generator | 在 `/docs` 页面切换到 SDK Generator tab | 显示代码预览区域 | 语言下拉列表含 TypeScript、Python、Java、Go 四个选项 |
+| WEB-017 | Monitoring | 浏览器访问 `/monitoring` | 显示 Grafana iframe | iframe 正确嵌入 Grafana 仪表盘；需 Grafana 服务运行 |

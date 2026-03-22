@@ -13,10 +13,16 @@
   - [4.2 API 文档](#42-api-文档)
   - [4.3 沙箱测试管理](#43-沙箱测试管理)
   - [4.4 补偿管理](#44-补偿管理)
+  - [4.5 API Explorer](#45-api-explorer)
+  - [4.6 Webhook 管理](#46-webhook-管理)
+  - [4.7 SDK 代码生成](#47-sdk-代码生成)
+  - [4.8 Monitoring（监控面板）](#48-monitoring监控面板)
 - [5. 网关使用](#5-网关使用)
   - [5.1 通过网关调用转换后的 API](#51-通过网关调用转换后的-api)
   - [5.2 投递保障配置](#52-投递保障配置)
   - [5.3 沙箱调用](#53-沙箱调用)
+  - [5.4 Webhook 推送](#54-webhook-推送)
+  - [5.5 告警配置](#55-告警配置)
 - [6. 监控与可观测性](#6-监控与可观测性)
 - [7. LLM 增强功能](#7-llm-增强功能)
 - [8. 常见问题 (FAQ)](#8-常见问题-faq)
@@ -471,6 +477,9 @@ Web 管理平台是一个 React SPA 应用，默认通过 Platform API 的静态
 | `/docs` | API Documentation | Swagger UI / Agent Prompt / OpenAPI 下载 |
 | `/sandbox` | Sandbox Manager | 沙箱测试会话管理 |
 | `/compensation` | Dead Letter Queue | 死信队列与补偿管理 |
+| `/explorer` | API Explorer | 交互式 API 调试器 |
+| `/webhooks` | Webhook Manager | Webhook 推送订阅管理 |
+| `/monitoring` | Monitoring | Grafana 监控面板嵌入 |
 
 ### 4.1 仪表盘 (Dashboard)
 
@@ -740,6 +749,131 @@ API 等价操作：
 curl -X POST http://localhost:8080/api/v1/compensation/dead-letters/{id}/resolve
 ```
 
+### 4.5 API Explorer
+
+API Explorer 是一个类 Postman 的交互式 API 调试器，内置于 Web 管理平台中，无需离开浏览器即可对网关路由发起测试请求。
+
+![API Explorer](test-reports/frontend-screenshots/p6-02-api-explorer.png)
+*图 4.10: API Explorer — 左侧路由列表，右侧请求构建器与响应查看器*
+
+#### 使用方式
+
+1. 从左侧路由列表中选择目标路由（按项目和协议类型分组）
+2. 在右侧面板中构建请求：编辑请求体 JSON、设置请求头
+3. 切换目标环境：**Gateway**（`/gw/` 前缀，转发到真实后端）或 **Sandbox**（`/sandbox/` 前缀，走沙箱模式）
+4. 点击 **Send** 发送请求
+5. 在下方响应区域查看 HTTP 状态码、响应头和响应体
+
+Explorer 会根据路由的 `request_schema` 自动填充请求体模板，减少手动输入。
+
+### 4.6 Webhook 管理
+
+Webhook 管理页面用于创建和管理 Webhook 推送订阅。当平台发生特定事件时，系统会向已订阅的 URL 发送 HTTP POST 通知。
+
+![Webhook Manager](test-reports/frontend-screenshots/p6-03-webhook-manager.png)
+*图 4.11: Webhook Manager — 订阅列表与创建表单*
+
+#### 创建 Webhook 订阅
+
+1. 点击 **New Webhook** 按钮
+2. 填写订阅信息：
+
+| 字段 | 必填 | 说明 |
+|------|------|------|
+| URL | 是 | 推送目标地址，需为 HTTPS 或 HTTP 端点 |
+| Event Types | 是 | 订阅的事件类型，可多选 |
+| Description | 否 | 订阅描述，便于识别用途 |
+
+3. 点击 **Create** 提交
+
+#### 支持的事件类型
+
+| 事件类型 | 说明 |
+|---------|------|
+| `DeliveryFailed` | 投递失败（进入重试） |
+| `DeadLetter` | 死信产生（超出最大重试次数） |
+| `GenerationCompleted` | 合约生成完成 |
+| `RouteUpdated` | 路由配置变更 |
+
+#### 管理操作
+
+- **列表查看** — 进入页面后自动加载所有 Webhook 订阅，展示 URL、事件类型、描述等信息
+- **删除** — 点击订阅行的 **Delete** 按钮移除订阅
+
+API 等价操作：
+
+```bash
+# 创建订阅
+curl -X POST http://localhost:8080/api/v1/webhooks \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com/hook","event_types":["DeadLetter","DeliveryFailed"],"description":"告警通知"}'
+
+# 列出订阅
+curl http://localhost:8080/api/v1/webhooks
+
+# 删除订阅
+curl -X DELETE http://localhost:8080/api/v1/webhooks/{id}
+```
+
+### 4.7 SDK 代码生成
+
+SDK 代码生成功能可以根据当前网关路由的 OpenAPI 规范，自动生成多种语言的 API 客户端代码。
+
+![SDK Generator](test-reports/frontend-screenshots/p6-04-sdk-generator.png)
+*图 4.12: SDK Generator — 选择语言后预览生成的客户端代码*
+
+#### 支持语言
+
+| 语言 | 生成内容 |
+|------|---------|
+| **TypeScript** | 基于 `fetch` 的类型安全客户端 |
+| **Python** | 基于 `requests` 的客户端类 |
+| **Java** | 基于 `HttpClient` 的客户端类 |
+| **Go** | 基于 `net/http` 的客户端包 |
+
+#### 使用方式
+
+1. 进入 API Docs 页面（`/docs`）
+2. 切换到 **SDK Generator** 标签页
+3. 从语言下拉列表中选择目标语言
+4. 页面自动加载并展示生成的客户端代码预览
+5. 点击 **Download** 按钮下载代码文件
+
+API 等价操作：
+
+```bash
+# 获取 TypeScript SDK
+curl http://localhost:8080/api/v1/docs/sdk/typescript
+
+# 获取 Python SDK
+curl http://localhost:8080/api/v1/docs/sdk/python
+```
+
+### 4.8 Monitoring（监控面板）
+
+Monitoring 页面将 Grafana 仪表盘嵌入到 Web 管理平台中，提供一站式的系统运行状态监控。
+
+#### 面板内容
+
+| 面板 | 指标 | 说明 |
+|------|------|------|
+| QPS | 每秒请求数 | 实时网关吞吐量 |
+| Latency P99 | 第 99 百分位延迟 | 反映长尾请求性能 |
+| Error Rate | 5xx 错误率 | 系统健康度核心指标 |
+| Circuit Breaker Status | 熔断器状态 | 各后端绑定的熔断器开合状态 |
+| Backend Latency | 后端响应延迟 | 按协议类型（SOAP/CLI/SSH）分组 |
+
+#### 前置条件
+
+Monitoring 页面依赖 Grafana 服务运行。请确保通过 Docker Compose 启动了完整的可观测性栈：
+
+```bash
+cd docker
+docker compose up -d grafana prometheus
+```
+
+Grafana 默认地址为 `http://localhost:3000`，Monitoring 页面通过 iframe 嵌入 Grafana 仪表盘。若 Grafana 未启动，页面会显示连接失败提示。
+
 ---
 
 ## 5. 网关使用
@@ -894,6 +1028,56 @@ curl -X POST http://localhost:8080/sandbox/calculator/add \
   -H "X-Sandbox-Session: 550e8400-e29b-41d4-a716-446655440000" \
   -d '{"a": 1, "b": 2}'
 ```
+
+### 5.4 Webhook 推送
+
+当系统发生特定事件（如死信产生、合约生成完成等）时，会向已注册的 Webhook 订阅地址发送 HTTP POST 推送通知。
+
+#### 配置下游接收推送
+
+1. 在你的服务中暴露一个 HTTP POST 端点用于接收推送
+2. 通过 API 或 Web 管理平台创建 Webhook 订阅，指定该端点 URL 和关注的事件类型
+3. 系统在事件触发时会向该 URL 发送 JSON 格式的推送消息
+
+推送请求格式：
+
+```bash
+POST <your-webhook-url>
+Content-Type: application/json
+
+{
+  "event_type": "DeadLetter",
+  "timestamp": "2026-03-22T10:30:00Z",
+  "payload": { ... }
+}
+```
+
+若推送失败（目标不可达或返回非 2xx），系统会记录投递失败事件。建议下游端点返回 `200 OK` 确认接收。
+
+### 5.5 告警配置
+
+平台支持通过环境变量配置告警通知推送，当系统产生告警事件时自动发送到指定的 Webhook 地址。
+
+#### 环境变量
+
+| 环境变量 | 说明 | 示例 |
+|---------|------|------|
+| `ALERT_WEBHOOK_URL` | 告警推送目标地址 | `https://hooks.slack.com/services/T.../B.../xxx` |
+| `ALERT_WEBHOOK_TYPE` | 推送格式类型 | `slack` 或 `dingtalk` |
+
+#### 配置示例
+
+```bash
+# Slack 告警
+ALERT_WEBHOOK_URL=https://hooks.slack.com/services/T00000/B00000/xxxxx
+ALERT_WEBHOOK_TYPE=slack
+
+# 钉钉告警
+ALERT_WEBHOOK_URL=https://oapi.dingtalk.com/robot/send?access_token=xxxxx
+ALERT_WEBHOOK_TYPE=dingtalk
+```
+
+系统会根据 `ALERT_WEBHOOK_TYPE` 自动适配推送消息格式（Slack Block Kit 或钉钉 Markdown），无需额外配置。
 
 ---
 
@@ -1192,6 +1376,38 @@ curl http://localhost:8080/api/v1/compensation/delivery-records/{record-id}
 | `pty` | — | 规划中 |
 | `odata` | — | 规划中 |
 
+### Q11: 如何开发自定义协议插件？
+
+API-Anything 支持通过动态库实现自定义协议适配器插件。开发步骤：
+
+1. 使用 `plugin-sdk` crate 作为开发依赖，实现 `ProtocolPlugin` trait
+2. 编译为动态库（Linux 下为 `.so`，macOS 下为 `.dylib`）
+3. 将编译产物放入插件目录（由 `PLUGIN_DIR` 环境变量指定，默认为 `./plugins`）
+4. 通过 API 触发插件扫描，或重启服务自动加载
+
+```bash
+# 编译插件
+cargo build --release -p my-custom-plugin
+cp target/release/libmy_custom_plugin.so ./plugins/
+
+# 触发扫描
+curl -X POST http://localhost:8080/api/v1/plugins/scan
+
+# 查看已加载插件
+curl http://localhost:8080/api/v1/plugins
+```
+
+### Q12: 如何配置 Kafka 事件总线？
+
+平台默认使用 PostgreSQL 作为事件总线（`EVENT_BUS_TYPE=pg`）。若需使用 Kafka 作为事件总线以获得更高吞吐量，配置以下环境变量：
+
+```bash
+EVENT_BUS_TYPE=kafka
+KAFKA_BROKERS=localhost:9092
+```
+
+PG 模式下事件直接写入 PostgreSQL 表并通过轮询消费，适用于中小规模部署。Kafka 模式适用于高吞吐、多消费者场景。
+
 ---
 
 ## API 端点速查表
@@ -1217,6 +1433,14 @@ curl http://localhost:8080/api/v1/compensation/delivery-records/{record-id}
 | GET | `/api/v1/docs` | Swagger UI 页面 |
 | GET | `/api/v1/docs/openapi.json` | OpenAPI 3.0 规范 (JSON) |
 | GET | `/api/v1/docs/agent-prompt` | AI Agent 提示词 (Markdown) |
+| GET | `/api/v1/docs/sdk/{language}` | 生成指定语言的 SDK 代码 |
+| POST | `/api/v1/webhooks` | 创建 Webhook 订阅 |
+| GET | `/api/v1/webhooks` | 列出所有 Webhook 订阅 |
+| DELETE | `/api/v1/webhooks/{id}` | 删除 Webhook 订阅 |
+| GET | `/api/v1/plugins` | 列出已加载的插件 |
+| POST | `/api/v1/plugins/scan` | 扫描并加载插件目录 |
+| GET | `/api/v1/sandbox-sessions/{id}/recordings` | 查看沙箱会话录制 |
+| DELETE | `/api/v1/sandbox-sessions/{id}/recordings` | 清空沙箱会话录制 |
 
 ### 网关 (`/gw/`)
 

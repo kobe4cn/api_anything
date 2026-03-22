@@ -121,6 +121,10 @@ cp .env.example .env
 | `API_HOST` | `0.0.0.0` | 服务监听地址 |
 | `API_PORT` | `8080` | 服务监听端口 |
 | `RUST_LOG` | `api_anything=debug,tower_http=debug` | 日志级别 |
+| `EVENT_BUS_TYPE` | `pg` | 事件总线类型：`pg`（PostgreSQL）或 `kafka` |
+| `ALERT_WEBHOOK_URL` | 无 | 告警通知推送地址（可选） |
+| `ALERT_WEBHOOK_TYPE` | 无 | 告警推送格式：`slack` 或 `dingtalk`（可选） |
+| `PLUGIN_DIR` | `./plugins` | 自定义协议插件目录路径 |
 
 ### 2.3 使用 Podman Compose 启动基础设施
 
@@ -585,6 +589,20 @@ service:
 - **Prometheus**（默认数据源）：指标查询
 - **Tempo**：链路追踪，配置了 `tracesToLogsV2`（关联 Loki）和 `tracesToMetrics`（关联 Prometheus）
 - **Loki**：日志查询，配置了 `derivedFields` 从日志中的 `trace_id` 提取链路追踪链接
+
+### 4.6 Grafana Dashboard 预置面板
+
+Docker Compose 启动的 Grafana 实例预配置了 API-Anything 专用仪表盘（通过 provisioning 自动加载），包含以下面板：
+
+| 面板 | 数据源 | PromQL / 查询 | 说明 |
+|------|--------|--------------|------|
+| **QPS** | Prometheus | `rate(http_server_request_duration_seconds_count[1m])` | 网关每秒请求数，按路径分组 |
+| **Latency P99** | Prometheus | `histogram_quantile(0.99, rate(http_server_request_duration_seconds_bucket[5m]))` | 第 99 百分位延迟 |
+| **Error Rate** | Prometheus | `rate(http_server_request_duration_seconds_count{status=~"5.."}[5m]) / rate(http_server_request_duration_seconds_count[5m])` | 5xx 错误比率 |
+| **Circuit Breaker Status** | Prometheus | `circuit_breaker_state` | 各后端绑定的熔断器状态（Closed/Open/HalfOpen） |
+| **Backend Latency** | Prometheus | `histogram_quantile(0.95, rate(backend_request_duration_seconds_bucket[5m]))` | 按协议类型分组的后端响应延迟 |
+
+这些面板在 Web 管理平台的 Monitoring 页面（`/monitoring`）中通过 iframe 嵌入展示，无需单独访问 Grafana。
 
 ---
 
