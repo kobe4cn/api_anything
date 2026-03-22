@@ -72,7 +72,6 @@ rand = "0.8"
 
 # SSH client
 russh = "0.58"
-russh-keys = "0.50.0-beta.7"
 async-trait = "0.1"
 
 # Dynamic library loading
