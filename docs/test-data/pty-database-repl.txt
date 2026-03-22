@@ -1,0 +1,52 @@
+# PTY Interaction Recording
+# Program: mysql
+# Args: -u root -p -h 10.0.1.100
+# Prompt Pattern: mysql>\s*$
+# Description: MySQL database REPL interaction
+
+## Init Commands:
+USE production_db;
+
+## Command: SELECT COUNT(*) as total FROM users WHERE status = 'active'
+## Description: Count active users
+## Output Format: table
+## Sample Output:
++-------+
+| total |
++-------+
+|  1234 |
++-------+
+1 row in set (0.02 sec)
+
+## Command: SELECT id, name, email, created_at FROM users ORDER BY created_at DESC LIMIT {limit}
+## Description: List recent users with pagination
+## Output Format: table
+## Sample Output:
++----+------------+---------------------+---------------------+
+| id | name       | email               | created_at          |
++----+------------+---------------------+---------------------+
+|  5 | John Doe   | john@example.com    | 2024-01-15 10:30:00 |
+|  4 | Jane Smith | jane@example.com    | 2024-01-14 09:20:00 |
++----+------------+---------------------+---------------------+
+2 rows in set (0.01 sec)
+
+## Command: SHOW TABLE STATUS LIKE '{table}'
+## Description: Get table statistics
+## Output Format: table
+## Sample Output:
++-------+--------+---------+------+------+-----+
+| Name  | Engine | Version | Rows | Avg  | AI  |
++-------+--------+---------+------+------+-----+
+| users | InnoDB |      10 | 1234 |  128 |     |
++-------+--------+---------+------+------+-----+
+
+## Command: SHOW PROCESSLIST
+## Description: List active database connections
+## Output Format: table
+## Sample Output:
++----+---------+-----------+---------------+---------+------+-------+
+| Id | User    | Host      | db            | Command | Time | State |
++----+---------+-----------+---------------+---------+------+-------+
+|  1 | root    | localhost | production_db | Query   |    0 | init  |
+|  2 | app_usr | 10.0.1.50 | production_db | Sleep   |  120 |       |
++----+---------+-----------+---------------+---------+------+-------+

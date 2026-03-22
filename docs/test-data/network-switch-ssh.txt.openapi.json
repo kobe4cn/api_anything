@@ -1,0 +1,100 @@
+{
+  "info": {
+    "title": "test-ssh-network-switch API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/gw/execute_switch_command": {
+      "post": {
+        "operationId": "executeSwitchCommand",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "command": {
+                    "type": "string"
+                  },
+                  "config": {
+                    "properties": {
+                      "host": {
+                        "type": "string"
+                      },
+                      "password": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "port": {
+                        "type": "integer"
+                      },
+                      "private_key": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "username": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "host",
+                      "port",
+                      "username"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "config",
+                  "command"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "nullable": true
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Executes a command on a network switch via SSH."
+      }
+    }
+  }
+}

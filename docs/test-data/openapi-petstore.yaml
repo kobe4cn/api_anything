@@ -1,0 +1,194 @@
+openapi: "3.0.3"
+info:
+  title: Petstore API
+  version: "1.0.0"
+  description: A sample Petstore REST API with complex types
+servers:
+  - url: http://petstore.example.com/api/v1
+
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      summary: List all pets
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: status
+          in: query
+          schema: { type: string, enum: [available, pending, sold] }
+      responses:
+        "200":
+          description: A list of pets
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Pet' }
+    post:
+      operationId: createPet
+      summary: Create a pet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePetRequest' }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pet' }
+
+  /pets/{petId}:
+    get:
+      operationId: getPet
+      summary: Get a pet by ID
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: A pet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pet' }
+
+    put:
+      operationId: updatePet
+      summary: Update a pet
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdatePetRequest' }
+      responses:
+        "200":
+          description: Updated pet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pet' }
+
+    delete:
+      operationId: deletePet
+      summary: Delete a pet
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  /pets/{petId}/vaccinations:
+    get:
+      operationId: listVaccinations
+      summary: List vaccinations for a pet
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Vaccination' }
+
+    post:
+      operationId: addVaccination
+      summary: Add a vaccination record
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateVaccinationRequest' }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Vaccination' }
+
+components:
+  schemas:
+    Pet:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        species: { type: string, enum: [dog, cat, bird, fish, other] }
+        breed: { type: string }
+        age: { type: integer }
+        weight: { type: number, format: float }
+        status: { type: string, enum: [available, pending, sold] }
+        tags: { type: array, items: { type: string } }
+        owner:
+          $ref: '#/components/schemas/Owner'
+        vaccinations:
+          type: array
+          items: { $ref: '#/components/schemas/Vaccination' }
+
+    Owner:
+      type: object
+      properties:
+        name: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string }
+        address:
+          type: object
+          properties:
+            street: { type: string }
+            city: { type: string }
+            zipCode: { type: string }
+
+    CreatePetRequest:
+      type: object
+      required: [name, species]
+      properties:
+        name: { type: string }
+        species: { type: string, enum: [dog, cat, bird, fish, other] }
+        breed: { type: string }
+        age: { type: integer }
+        weight: { type: number }
+        owner:
+          $ref: '#/components/schemas/Owner'
+
+    UpdatePetRequest:
+      type: object
+      properties:
+        name: { type: string }
+        status: { type: string, enum: [available, pending, sold] }
+        weight: { type: number }
+
+    Vaccination:
+      type: object
+      properties:
+        id: { type: integer }
+        vaccine: { type: string }
+        date: { type: string, format: date }
+        veterinarian: { type: string }
+        nextDueDate: { type: string, format: date }
+
+    CreateVaccinationRequest:
+      type: object
+      required: [vaccine, date]
+      properties:
+        vaccine: { type: string }
+        date: { type: string, format: date }
+        veterinarian: { type: string }

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+  <edmx:DataServices>
+    <Schema Namespace="ProductService" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+
+      <EnumType Name="ProductStatus">
+        <Member Name="Active" Value="0"/>
+        <Member Name="Discontinued" Value="1"/>
+        <Member Name="OutOfStock" Value="2"/>
+      </EnumType>
+
+      <ComplexType Name="Address">
+        <Property Name="Street" Type="Edm.String" Nullable="false"/>
+        <Property Name="City" Type="Edm.String" Nullable="false"/>
+        <Property Name="Country" Type="Edm.String" Nullable="false"/>
+        <Property Name="PostalCode" Type="Edm.String"/>
+      </ComplexType>
+
+      <EntityType Name="Category">
+        <Key><PropertyRef Name="Id"/></Key>
+        <Property Name="Id" Type="Edm.Int32" Nullable="false"/>
+        <Property Name="Name" Type="Edm.String" Nullable="false"/>
+        <Property Name="Description" Type="Edm.String"/>
+        <NavigationProperty Name="Products" Type="Collection(ProductService.Product)"/>
+      </EntityType>
+
+      <EntityType Name="Product">
+        <Key><PropertyRef Name="Id"/></Key>
+        <Property Name="Id" Type="Edm.Int32" Nullable="false"/>
+        <Property Name="Name" Type="Edm.String" Nullable="false" MaxLength="100"/>
+        <Property Name="Price" Type="Edm.Decimal" Nullable="false" Precision="10" Scale="2"/>
+        <Property Name="Status" Type="ProductService.ProductStatus" Nullable="false"/>
+        <Property Name="CreatedAt" Type="Edm.DateTimeOffset"/>
+        <Property Name="Tags" Type="Collection(Edm.String)"/>
+        <NavigationProperty Name="Category" Type="ProductService.Category"/>
+        <NavigationProperty Name="Supplier" Type="ProductService.Supplier"/>
+      </EntityType>
+
+      <EntityType Name="Supplier">
+        <Key><PropertyRef Name="Id"/></Key>
+        <Property Name="Id" Type="Edm.Int32" Nullable="false"/>
+        <Property Name="Name" Type="Edm.String" Nullable="false"/>
+        <Property Name="ContactEmail" Type="Edm.String"/>
+        <Property Name="Address" Type="ProductService.Address"/>
+        <NavigationProperty Name="Products" Type="Collection(ProductService.Product)"/>
+      </EntityType>
+
+      <EntityType Name="Order">
+        <Key><PropertyRef Name="Id"/></Key>
+        <Property Name="Id" Type="Edm.Guid" Nullable="false"/>
+        <Property Name="CustomerName" Type="Edm.String" Nullable="false"/>
+        <Property Name="TotalAmount" Type="Edm.Decimal" Precision="12" Scale="2"/>
+        <Property Name="OrderDate" Type="Edm.DateTimeOffset" Nullable="false"/>
+        <Property Name="ShippingAddress" Type="ProductService.Address"/>
+        <NavigationProperty Name="Items" Type="Collection(ProductService.OrderItem)"/>
+      </EntityType>
+
+      <EntityType Name="OrderItem">
+        <Key><PropertyRef Name="Id"/></Key>
+        <Property Name="Id" Type="Edm.Int32" Nullable="false"/>
+        <Property Name="ProductId" Type="Edm.Int32" Nullable="false"/>
+        <Property Name="Quantity" Type="Edm.Int32" Nullable="false"/>
+        <Property Name="UnitPrice" Type="Edm.Decimal" Precision="10" Scale="2"/>
+      </EntityType>
+
+      <EntityContainer Name="ProductServiceContainer">
+        <EntitySet Name="Products" EntityType="ProductService.Product">
+          <NavigationPropertyBinding Path="Category" Target="Categories"/>
+          <NavigationPropertyBinding Path="Supplier" Target="Suppliers"/>
+        </EntitySet>
+        <EntitySet Name="Categories" EntityType="ProductService.Category">
+          <NavigationPropertyBinding Path="Products" Target="Products"/>
+        </EntitySet>
+        <EntitySet Name="Suppliers" EntityType="ProductService.Supplier">
+          <NavigationPropertyBinding Path="Products" Target="Products"/>
+        </EntitySet>
+        <EntitySet Name="Orders" EntityType="ProductService.Order">
+          <NavigationPropertyBinding Path="Items" Target="OrderItems"/>
+        </EntitySet>
+        <EntitySet Name="OrderItems" EntityType="ProductService.OrderItem"/>
+      </EntityContainer>
+
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>
