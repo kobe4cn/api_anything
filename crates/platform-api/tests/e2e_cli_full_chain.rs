@@ -42,6 +42,39 @@ fn mock_script_path() -> String {
         .to_string()
 }
 
+/// 创建指向目标可执行文件的唯一 symlink，使每个测试生成独立的路由路径前缀，
+/// 避免并发测试因共享同一路由路径而互相干扰。
+/// 返回 (symlink_path, slug)，slug 用于构造请求 URL。
+#[cfg(unix)]
+fn unique_symlink(target: &str, short: &str, prefix: &str) -> (String, String) {
+    let slug = format!("{prefix}-{short}");
+    let link_path = std::env::temp_dir().join(&slug);
+    // 幂等：先尝试删除旧 symlink
+    let _ = std::fs::remove_file(&link_path);
+    std::os::unix::fs::symlink(target, &link_path).unwrap();
+    (link_path.to_string_lossy().to_string(), slug)
+}
+
+/// 创建指向 mock 脚本的唯一 symlink
+#[cfg(unix)]
+fn unique_mock_script(short: &str, prefix: &str) -> (String, String) {
+    unique_symlink(&mock_script_path(), short, prefix)
+}
+
+/// 创建指向 /bin/echo 的唯一 symlink
+#[cfg(unix)]
+fn unique_echo(short: &str, prefix: &str) -> (String, String) {
+    unique_symlink("/bin/echo", short, prefix)
+}
+
+/// 清理唯一 symlink
+#[cfg(unix)]
+fn cleanup_symlink(short: &str, prefix: &str) {
+    let slug = format!("{prefix}-{short}");
+    let link_path = std::env::temp_dir().join(&slug);
+    let _ = std::fs::remove_file(&link_path);
+}
+
 /// 通用辅助：创建项目、运行 CLI pipeline、加载路由、构建测试服务器
 #[cfg(unix)]
 async fn setup_cli_env(
@@ -101,10 +134,10 @@ async fn cleanup(pool: &sqlx::PgPool, project_id: Uuid) {
 #[tokio::test]
 async fn cli_basic_echo_command() {
     // 验证最基础的 CLI 全链路：JSON 请求 → CLI 参数 → 脚本执行 → JSON 响应
-    let script = mock_script_path();
     let suffix = Uuid::new_v4().to_string().replace('-', "");
     let short = &suffix[..8];
     let project_name = format!("cli-e2e-basic-{short}");
+    let (script, slug) = unique_mock_script(short, "mock-basic");
 
     let (server, pool, project_id) = setup_cli_env(
         &script,
@@ -114,9 +147,8 @@ async fn cli_basic_echo_command() {
     )
     .await;
 
-    // CliMapper 提取脚本 basename 并去除扩展名：mock-report-gen.sh → mock-report-gen
     let resp = server
-        .post("/gw/api/v1/mock-report-gen/generate")
+        .post(&format!("/gw/api/v1/{slug}/generate"))
         .json(&json!({"type": "daily"}))
         .await;
 
@@ -128,6 +160,7 @@ async fn cli_basic_echo_command() {
     assert_eq!(body["type"], "daily");
 
     cleanup(&pool, project_id).await;
+    cleanup_symlink(short, "mock-basic");
 }
 
 #[cfg(unix)]
@@ -135,10 +168,10 @@ async fn cli_basic_echo_command() {
 async fn cli_json_output_parsing() {
     // 验证 output_format 为 json 时，CLI stdout 的 JSON 被直接解析为响应对象，
     // 而非包裹在 {"stdout": "..."} 中
-    let script = mock_script_path();
     let suffix = Uuid::new_v4().to_string().replace('-', "");
     let short = &suffix[..8];
     let project_name = format!("cli-e2e-json-{short}");
+    let (script, slug) = unique_mock_script(short, "mock-json");
 
     let (server, pool, project_id) = setup_cli_env(
         &script,
@@ -149,7 +182,7 @@ async fn cli_json_output_parsing() {
     .await;
 
     let resp = server
-        .post("/gw/api/v1/mock-report-gen/generate")
+        .post(&format!("/gw/api/v1/{slug}/generate"))
         .json(&json!({"type": "weekly"}))
         .await;
 
@@ -164,6 +197,7 @@ async fn cli_json_output_parsing() {
     assert_eq!(body["type"], "weekly");
 
     cleanup(&pool, project_id).await;
+    cleanup_symlink(short, "mock-json");
 }
 
 #[cfg(unix)]
@@ -171,10 +205,10 @@ async fn cli_json_output_parsing() {
 async fn cli_raw_text_output() {
     // 验证 output_format 为 raw_text 时，响应包含 {"stdout": "..."}
     // 通过直接操作数据库将 output_format 改为 RawText
-    let script = mock_script_path();
     let suffix = Uuid::new_v4().to_string().replace('-', "");
     let short = &suffix[..8];
     let project_name = format!("cli-e2e-raw-{short}");
+    let (script, slug) = unique_mock_script(short, "mock-raw");
 
     let pool = common::test_pool().await;
     let repo = PgMetadataRepo::new(pool.clone());
@@ -218,7 +252,7 @@ async fn cli_raw_text_output() {
     let server = TestServer::new(build_app(state)).unwrap();
 
     let resp = server
-        .post("/gw/api/v1/mock-report-gen/generate")
+        .post(&format!("/gw/api/v1/{slug}/generate"))
         .json(&json!({"type": "daily"}))
         .await;
 
@@ -232,6 +266,7 @@ async fn cli_raw_text_output() {
     );
 
     cleanup(&pool, project.id).await;
+    cleanup_symlink(short, "mock-raw");
 }
 
 #[cfg(unix)]
@@ -239,10 +274,10 @@ async fn cli_raw_text_output() {
 async fn cli_command_failure_returns_502() {
     // 验证当脚本对未知子命令返回 exit 1 时，网关返回 502 + 错误详情。
     // mock-report-gen.sh 对未知子命令输出 stderr 并 exit 1
-    let script = mock_script_path();
     let suffix = Uuid::new_v4().to_string().replace('-', "");
     let short = &suffix[..8];
     let project_name = format!("cli-e2e-fail-{short}");
+    let (script, slug) = unique_mock_script(short, "mock-fail");
 
     let pool = common::test_pool().await;
     let repo = PgMetadataRepo::new(pool.clone());
@@ -285,7 +320,7 @@ async fn cli_command_failure_returns_502() {
     let server = TestServer::new(build_app(state)).unwrap();
 
     let resp = server
-        .post("/gw/api/v1/mock-report-gen/generate")
+        .post(&format!("/gw/api/v1/{slug}/generate"))
         .json(&json!({"type": "daily"}))
         .await;
 
@@ -300,6 +335,7 @@ async fn cli_command_failure_returns_502() {
     );
 
     cleanup(&pool, project.id).await;
+    cleanup_symlink(short, "mock-fail");
 }
 
 #[cfg(unix)]
@@ -319,11 +355,13 @@ async fn cli_nonexistent_program_returns_502() {
         .await
         .unwrap();
 
-    // 使用一个合法的帮助文本创建路由，但 program 指向不存在的路径
+    // 使用一个合法的帮助文本创建路由，但 program 指向不存在的路径。
+    // 路径中包含唯一后缀，避免与其他测试产生的同名路由冲突
+    let nonexistent = format!("/nonexistent/program/noexist-{short}");
     api_anything_generator::pipeline::GenerationPipeline::run_cli(
         &repo,
         project.id,
-        "/nonexistent/program/xyz",
+        &nonexistent,
         sample_main_help(),
         &[("generate", sample_sub_help())],
     )
@@ -342,9 +380,9 @@ async fn cli_nonexistent_program_returns_502() {
     };
     let server = TestServer::new(build_app(state)).unwrap();
 
-    // CliMapper 对程序路径取 basename 去扩展名：/nonexistent/program/xyz → xyz
+    // CliMapper 对程序路径取 basename：/nonexistent/program/noexist-xxx → noexist-xxx
     let resp = server
-        .post("/gw/api/v1/xyz/generate")
+        .post(&format!("/gw/api/v1/noexist-{short}/generate"))
         .json(&json!({"type": "daily"}))
         .await;
 
@@ -365,6 +403,7 @@ async fn cli_command_injection_prevention() {
     let suffix = Uuid::new_v4().to_string().replace('-', "");
     let short = &suffix[..8];
     let project_name = format!("cli-e2e-inject-{short}");
+    let (echo_path, slug) = unique_echo(short, "echo-inject");
 
     let pool = common::test_pool().await;
     let repo = PgMetadataRepo::new(pool.clone());
@@ -375,11 +414,11 @@ async fn cli_command_injection_prevention() {
         .await
         .unwrap();
 
-    // 使用 echo 作为 program 来验证参数是否被逐字传递
+    // 使用 echo 的唯一 symlink 作为 program 来验证参数是否被逐字传递
     api_anything_generator::pipeline::GenerationPipeline::run_cli(
         &repo,
         project.id,
-        "echo",
+        &echo_path,
         sample_main_help(),
         &[("generate", sample_sub_help())],
     )
@@ -408,7 +447,7 @@ async fn cli_command_injection_prevention() {
     let server = TestServer::new(build_app(state)).unwrap();
 
     let resp = server
-        .post("/gw/api/v1/echo/generate")
+        .post(&format!("/gw/api/v1/{slug}/generate"))
         .json(&json!({"type": "; rm -rf /"}))
         .await;
 
@@ -422,6 +461,7 @@ async fn cli_command_injection_prevention() {
     );
 
     cleanup(&pool, project.id).await;
+    cleanup_symlink(short, "echo-inject");
 }
 
 #[cfg(unix)]
@@ -431,6 +471,7 @@ async fn cli_command_injection_variants() {
     let suffix = Uuid::new_v4().to_string().replace('-', "");
     let short = &suffix[..8];
     let project_name = format!("cli-e2e-inject-v-{short}");
+    let (echo_path, slug) = unique_echo(short, "echo-injectv");
 
     let pool = common::test_pool().await;
     let repo = PgMetadataRepo::new(pool.clone());
@@ -444,7 +485,7 @@ async fn cli_command_injection_variants() {
     api_anything_generator::pipeline::GenerationPipeline::run_cli(
         &repo,
         project.id,
-        "echo",
+        &echo_path,
         sample_main_help(),
         &[("generate", sample_sub_help())],
     )
@@ -482,7 +523,7 @@ async fn cli_command_injection_variants() {
 
     for payload in payloads {
         let resp = server
-            .post("/gw/api/v1/echo/generate")
+            .post(&format!("/gw/api/v1/{slug}/generate"))
             .json(&json!({"type": payload}))
             .await;
 
@@ -496,6 +537,7 @@ async fn cli_command_injection_variants() {
     }
 
     cleanup(&pool, project.id).await;
+    cleanup_symlink(short, "echo-injectv");
 }
 
 #[cfg(unix)]
@@ -507,6 +549,7 @@ async fn cli_boolean_flag_handling() {
     let suffix = Uuid::new_v4().to_string().replace('-', "");
     let short = &suffix[..8];
     let project_name = format!("cli-e2e-bool-{short}");
+    let (echo_path, slug) = unique_echo(short, "echo-bool");
 
     let pool = common::test_pool().await;
     let repo = PgMetadataRepo::new(pool.clone());
@@ -517,11 +560,11 @@ async fn cli_boolean_flag_handling() {
         .await
         .unwrap();
 
-    // 使用 echo 来可视化传递的参数
+    // 使用 echo 的唯一 symlink 来可视化传递的参数
     api_anything_generator::pipeline::GenerationPipeline::run_cli(
         &repo,
         project.id,
-        "echo",
+        &echo_path,
         sample_main_help(),
         &[("generate", sample_sub_help())],
     )
@@ -549,7 +592,7 @@ async fn cli_boolean_flag_handling() {
     let server = TestServer::new(build_app(state)).unwrap();
 
     let resp = server
-        .post("/gw/api/v1/echo/generate")
+        .post(&format!("/gw/api/v1/{slug}/generate"))
         .json(&json!({"verbose": true, "quiet": false}))
         .await;
 
@@ -569,6 +612,7 @@ async fn cli_boolean_flag_handling() {
     );
 
     cleanup(&pool, project.id).await;
+    cleanup_symlink(short, "echo-bool");
 }
 
 #[cfg(unix)]
@@ -578,6 +622,7 @@ async fn cli_numeric_parameter() {
     let suffix = Uuid::new_v4().to_string().replace('-', "");
     let short = &suffix[..8];
     let project_name = format!("cli-e2e-num-{short}");
+    let (echo_path, slug) = unique_echo(short, "echo-num");
 
     let pool = common::test_pool().await;
     let repo = PgMetadataRepo::new(pool.clone());
@@ -591,7 +636,7 @@ async fn cli_numeric_parameter() {
     api_anything_generator::pipeline::GenerationPipeline::run_cli(
         &repo,
         project.id,
-        "echo",
+        &echo_path,
         sample_main_help(),
         &[("generate", sample_sub_help())],
     )
@@ -619,7 +664,7 @@ async fn cli_numeric_parameter() {
     let server = TestServer::new(build_app(state)).unwrap();
 
     let resp = server
-        .post("/gw/api/v1/echo/generate")
+        .post(&format!("/gw/api/v1/{slug}/generate"))
         .json(&json!({"count": 5, "name": "test"}))
         .await;
 
@@ -639,6 +684,7 @@ async fn cli_numeric_parameter() {
     );
 
     cleanup(&pool, project.id).await;
+    cleanup_symlink(short, "echo-num");
 }
 
 #[cfg(unix)]
@@ -646,10 +692,10 @@ async fn cli_numeric_parameter() {
 async fn cli_http_method_inference() {
     // 验证 CliMapper 根据子命令名称推断 HTTP 方法：
     // generate → POST（创建类动词），list → GET（查询类动词）
-    let script = mock_script_path();
     let suffix = Uuid::new_v4().to_string().replace('-', "");
     let short = &suffix[..8];
     let project_name = format!("cli-e2e-method-{short}");
+    let (script, slug) = unique_mock_script(short, "mock-method");
 
     let pool = common::test_pool().await;
     let repo = PgMetadataRepo::new(pool.clone());
@@ -706,16 +752,17 @@ async fn cli_http_method_inference() {
 
     // list 子命令应通过 GET 访问
     let resp = server
-        .get("/gw/api/v1/mock-report-gen/list")
+        .get(&format!("/gw/api/v1/{slug}/list"))
         .await;
     resp.assert_status(StatusCode::OK);
 
     // generate 子命令应通过 POST 访问
     let resp = server
-        .post("/gw/api/v1/mock-report-gen/generate")
+        .post(&format!("/gw/api/v1/{slug}/generate"))
         .json(&json!({"type": "daily"}))
         .await;
     resp.assert_status(StatusCode::OK);
 
     cleanup(&pool, project.id).await;
+    cleanup_symlink(short, "mock-method");
 }
