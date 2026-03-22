@@ -24,3 +24,4 @@ artifacts/
 # Web frontend
 web/node_modules/
 web/dist/
+test-reports/
