@@ -25,6 +25,9 @@
 
 ## 1. 平台概述
 
+![Swagger UI 展示所有网关路由](test-reports/frontend-screenshots/06-swagger-ui-loaded.png)
+*图 1.1: API-Anything 自动生成的 Swagger UI — 展示从 WSDL 转换而来的 REST API 路由*
+
 ### API-Anything 是什么
 
 API-Anything 是一个 AI 驱动的遗留系统 API 网关生成平台。它能够自动将 SOAP/WSDL 服务、CLI 命令行工具、SSH 远程命令等传统接口转换为标准的 RESTful JSON API，并提供统一的网关层进行流量管理、投递保障和可观测性。
@@ -473,6 +476,9 @@ Web 管理平台是一个 React SPA 应用，默认通过 Platform API 的静态
 
 Dashboard 是平台的首页，展示所有项目的卡片式列表。
 
+![Dashboard 项目列表](test-reports/frontend-screenshots/01-dashboard-project-list.png)
+*图 4.1: Dashboard 项目列表 — 展示所有项目卡片，包含项目名称、协议标签（wsdl/cli/ssh）、描述和所有者信息*
+
 #### 项目列表
 
 进入 Dashboard 后会自动加载所有项目。每个项目卡片显示：
@@ -485,6 +491,12 @@ Dashboard 是平台的首页，展示所有项目的卡片式列表。
 
 #### 创建新项目
 
+![创建项目表单](test-reports/frontend-screenshots/02-dashboard-create-project-form.png)
+*图 4.2: 点击 New Project 后弹出的创建表单*
+
+![表单填写完成](test-reports/frontend-screenshots/03-dashboard-create-project-filled.png)
+*图 4.3: 填写完成的项目表单（名称、所有者、描述、协议类型）*
+
 1. 点击右上角 **New Project** 按钮
 2. 填写项目表单：
 
@@ -496,6 +508,9 @@ Dashboard 是平台的首页，展示所有项目的卡片式列表。
 | Source Type | 是 | 来源类型，下拉选择：`WSDL` / `CLI` / `SSH` / `PTY` |
 
 3. 点击 **Create** 提交
+
+![项目创建成功](test-reports/frontend-screenshots/04-dashboard-project-created.png)
+*图 4.4: 项目创建成功后，新项目出现在列表顶部*
 
 通过 Web 创建的项目主要用于管理和组织，实际的路由生成仍需通过 CLI 工具执行。
 
@@ -519,6 +534,9 @@ API 文档页面提供三种方式查看和使用生成的 API 规范。
 
 #### Swagger UI 在线浏览
 
+![Swagger UI 嵌入](test-reports/frontend-screenshots/08-docs-page-swagger-embed.png)
+*图 4.5: Swagger UI 嵌入 Web Portal — 展示 API-Anything Gateway 标题、OAS 3.0 标识和所有 SOAP 路由列表*
+
 切换到 **Swagger UI** 标签页（默认标签），页面会嵌入一个 iframe 加载 `/api/v1/docs` 端点。Swagger UI 从 CDN 加载，自动读取 `/api/v1/docs/openapi.json` 规范。
 
 你可以在 Swagger UI 中：
@@ -530,6 +548,9 @@ API 文档页面提供三种方式查看和使用生成的 API 规范。
 OpenAPI 规范动态生成，每次访问都从数据库中的激活路由实时构建，确保文档与实际路由始终一致。
 
 #### Agent Prompt 查看
+
+![Agent Prompt](test-reports/frontend-screenshots/09-docs-agent-prompt.png)
+*图 4.6: Agent Prompt 视图 — 展示 Markdown 格式的 API 描述，包含每个路由的方法、路径、协议和 JSON Schema*
 
 切换到 **Agent Prompt** 标签页，页面会加载 `/api/v1/docs/agent-prompt` 端点返回的 Markdown 格式提示词。
 
@@ -553,9 +574,15 @@ OpenAPI 规范动态生成，每次访问都从数据库中的激活路由实时
 
 沙箱管理页面用于创建和管理沙箱测试会话。
 
+![Sandbox Manager](test-reports/frontend-screenshots/10-sandbox-manager-page.png)
+*图 4.7: 沙箱管理页面初始状态 — 需先从下拉列表中选择项目*
+
 #### 选择项目
 
 页面顶部提供项目下拉选择器，需先选择一个项目才能查看和管理该项目下的沙箱会话。
+
+![项目选中后](test-reports/frontend-screenshots/11-sandbox-project-selected.png)
+*图 4.8: 选中 demo-soap-calculator 项目后，显示会话列表和 New Session 按钮*
 
 #### 创建沙箱会话
 
@@ -654,6 +681,9 @@ curl -X POST http://localhost:8080/sandbox/calculator/add \
 ### 4.4 补偿管理
 
 补偿管理页面用于查看和处理死信队列中的失败投递记录。
+
+![Dead Letter Queue](test-reports/frontend-screenshots/12-compensation-dead-letter-queue.png)
+*图 4.9: 死信队列管理界面 — 表格展示 ID、Route、Status、Retries、Error、Updated 等列，支持全选、单条重推和标记已处理*
 
 #### 死信队列查看
 
