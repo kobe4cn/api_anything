@@ -31,6 +31,12 @@ pub fn build_app(state: AppState) -> Router {
             "/api/v1/sandbox-sessions/{id}",
             delete(routes::sandbox_sessions::delete_sandbox_session),
         )
+        // 录制数据管理：列出和清空指定会话的录制记录，供调试及 replay 数据维护使用
+        .route(
+            "/api/v1/sandbox-sessions/{id}/recordings",
+            get(routes::recordings::list_recordings)
+                .delete(routes::recordings::clear_recordings),
+        )
         // 补偿系统管理 API：死信队列查询、重试、批量重试、人工解决
         .route(
             "/api/v1/compensation/dead-letters",
@@ -65,6 +71,7 @@ pub fn build_app(state: AppState) -> Router {
         .route("/api/v1/docs", get(routes::docs::swagger_ui))
         .route("/api/v1/docs/openapi.json", get(routes::docs::openapi_json))
         .route("/api/v1/docs/agent-prompt", get(routes::docs::agent_prompt))
+        .route("/api/v1/docs/sdk/{language}", get(routes::docs::generate_sdk))
         // 通配路由捕获所有 /gw/ 前缀请求，交由动态路由器分发
         .route("/gw/{*rest}", any(routes::gateway::gateway_handler))
         // 沙箱通配路由：与网关共享路由表，但根据 X-Sandbox-Mode 头走 mock/replay/proxy 分支

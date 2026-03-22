@@ -1,4 +1,4 @@
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use api_anything_common::error::AppError;
@@ -130,6 +130,277 @@ pub async fn agent_prompt(State(state): State<AppState>) -> Result<impl IntoResp
         [("content-type", "text/markdown")],
         prompt,
     ))
+}
+
+/// 根据语言参数动态生成对应的 SDK 客户端代码；
+/// 基于当前活跃路由的 schema 信息模板化生成，无需外部代码生成工具
+pub async fn generate_sdk(
+    State(state): State<AppState>,
+    Path(language): Path<String>,
+) -> Result<impl IntoResponse, AppError> {
+    let routes = state.repo.list_active_routes_with_bindings().await?;
+    let code = match language.as_str() {
+        "typescript" => generate_typescript_sdk(&routes),
+        "python" => generate_python_sdk(&routes),
+        "java" => generate_java_sdk(&routes),
+        "go" => generate_go_sdk(&routes),
+        _ => return Err(AppError::BadRequest(format!("Unsupported language: {}. Supported: typescript, python, java, go", language))),
+    };
+    Ok((StatusCode::OK, [("content-type", "text/plain")], code))
+}
+
+/// 将路由路径转为合法的函数名：method + path，斜杠替换为下划线
+fn route_to_fn_name(method: &HttpMethod, path: &str) -> String {
+    let method_str = match method {
+        HttpMethod::Get => "get",
+        HttpMethod::Post => "post",
+        HttpMethod::Put => "put",
+        HttpMethod::Patch => "patch",
+        HttpMethod::Delete => "delete",
+    };
+    let path_part = path
+        .trim_start_matches('/')
+        .replace('/', "_")
+        .replace('-', "_");
+    format!("{}_{}", method_str, path_part)
+}
+
+/// 从 JSON Schema 中提取 properties 字段列表及其类型，
+/// 用于 SDK 函数签名中的参数定义
+fn extract_params(schema: &Value) -> Vec<(String, String)> {
+    let props = schema.get("properties")
+        .or_else(|| schema.get("content")
+            .and_then(|c| c.get("application/json"))
+            .and_then(|j| j.get("schema"))
+            .and_then(|s| s.get("properties"))
+        );
+    if let Some(Value::Object(map)) = props {
+        map.iter()
+            .map(|(name, prop)| {
+                let type_name = prop.get("type")
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("any")
+                    .to_string();
+                (name.clone(), type_name)
+            })
+            .collect()
+    } else {
+        Vec::new()
+    }
+}
+
+fn generate_typescript_sdk(routes: &[RouteWithBinding]) -> String {
+    let mut code = String::new();
+    code.push_str("// Auto-generated API-Anything SDK for TypeScript\n");
+    code.push_str("// Generated from active route definitions\n\n");
+    code.push_str("const BASE_URL = \"http://localhost:8080/gw\";\n\n");
+
+    for route in routes {
+        let fn_name = route_to_fn_name(&route.method, &route.path);
+        let method_str = format!("{:?}", route.method).to_uppercase();
+        let params = extract_params(&route.request_schema);
+
+        // 生成 TypeScript 接口和函数
+        if params.is_empty() {
+            code.push_str(&format!(
+                "export async function {fn_name}() {{\n"
+            ));
+        } else {
+            let ts_params: Vec<String> = params.iter().map(|(name, typ)| {
+                let ts_type = match typ.as_str() {
+                    "integer" | "number" => "number",
+                    "boolean" => "boolean",
+                    "array" => "any[]",
+                    _ => "string",
+                };
+                format!("{}: {}", name, ts_type)
+            }).collect();
+            code.push_str(&format!(
+                "export async function {fn_name}(body: {{{params}}}) {{\n",
+                fn_name = fn_name,
+                params = ts_params.join(", "),
+            ));
+        }
+
+        // fetch 调用
+        if method_str == "GET" || method_str == "DELETE" {
+            code.push_str(&format!(
+                "  const resp = await fetch(`${{BASE_URL}}{path}`, {{\n    method: \"{method}\"\n  }});\n",
+                path = route.path,
+                method = method_str,
+            ));
+        } else {
+            code.push_str(&format!(
+                "  const resp = await fetch(`${{BASE_URL}}{path}`, {{\n    method: \"{method}\",\n    headers: {{\"Content-Type\": \"application/json\"}},\n    body: JSON.stringify(body)\n  }});\n",
+                path = route.path,
+                method = method_str,
+            ));
+        }
+        code.push_str("  return resp.json();\n}\n\n");
+    }
+
+    code
+}
+
+fn generate_python_sdk(routes: &[RouteWithBinding]) -> String {
+    let mut code = String::new();
+    code.push_str("# Auto-generated API-Anything SDK for Python\n");
+    code.push_str("# Generated from active route definitions\n\n");
+    code.push_str("import requests\n\n");
+    code.push_str("BASE_URL = \"http://localhost:8080/gw\"\n\n");
+
+    for route in routes {
+        let fn_name = route_to_fn_name(&route.method, &route.path);
+        let method_str = format!("{:?}", route.method).to_lowercase();
+        let params = extract_params(&route.request_schema);
+
+        if params.is_empty() {
+            code.push_str(&format!("def {fn_name}():\n"));
+        } else {
+            let py_params: Vec<String> = params.iter().map(|(name, typ)| {
+                let py_type = match typ.as_str() {
+                    "integer" => "int",
+                    "number" => "float",
+                    "boolean" => "bool",
+                    "array" => "list",
+                    _ => "str",
+                };
+                format!("{}: {}", name, py_type)
+            }).collect();
+            code.push_str(&format!(
+                "def {fn_name}({params}):\n",
+                fn_name = fn_name,
+                params = py_params.join(", "),
+            ));
+        }
+
+        // requests 调用
+        if method_str == "get" || method_str == "delete" {
+            code.push_str(&format!(
+                "    resp = requests.{method}(f\"{{BASE_URL}}{path}\")\n",
+                method = method_str,
+                path = route.path,
+            ));
+        } else {
+            let json_body = if params.is_empty() {
+                "{}".to_string()
+            } else {
+                let fields: Vec<String> = params.iter()
+                    .map(|(name, _)| format!("\"{name}\": {name}"))
+                    .collect();
+                format!("{{{}}}", fields.join(", "))
+            };
+            code.push_str(&format!(
+                "    resp = requests.{method}(f\"{{BASE_URL}}{path}\", json={json_body})\n",
+                method = method_str,
+                path = route.path,
+                json_body = json_body,
+            ));
+        }
+        code.push_str("    return resp.json()\n\n");
+    }
+
+    code
+}
+
+fn generate_java_sdk(routes: &[RouteWithBinding]) -> String {
+    let mut code = String::new();
+    code.push_str("// Auto-generated API-Anything SDK for Java\n");
+    code.push_str("// Generated from active route definitions\n\n");
+    code.push_str("import java.net.URI;\n");
+    code.push_str("import java.net.http.HttpClient;\n");
+    code.push_str("import java.net.http.HttpRequest;\n");
+    code.push_str("import java.net.http.HttpResponse;\n\n");
+    code.push_str("public class ApiAnythingClient {\n");
+    code.push_str("    private static final String BASE_URL = \"http://localhost:8080/gw\";\n");
+    code.push_str("    private final HttpClient client = HttpClient.newHttpClient();\n\n");
+
+    for route in routes {
+        let fn_name = route_to_fn_name(&route.method, &route.path);
+        let method_str = format!("{:?}", route.method).to_uppercase();
+        let params = extract_params(&route.request_schema);
+
+        let java_params: Vec<String> = params.iter().map(|(name, typ)| {
+            let java_type = match typ.as_str() {
+                "integer" => "int",
+                "number" => "double",
+                "boolean" => "boolean",
+                _ => "String",
+            };
+            format!("{} {}", java_type, name)
+        }).collect();
+
+        code.push_str(&format!(
+            "    public String {fn_name}({params}) throws Exception {{\n",
+            fn_name = fn_name,
+            params = java_params.join(", "),
+        ));
+
+        if method_str == "GET" || method_str == "DELETE" {
+            code.push_str(&format!(
+                "        HttpRequest request = HttpRequest.newBuilder()\n            .uri(URI.create(BASE_URL + \"{path}\"))\n            .method(\"{method}\", HttpRequest.BodyPublishers.noBody())\n            .build();\n",
+                path = route.path,
+                method = method_str,
+            ));
+        } else {
+            code.push_str(&format!(
+                "        HttpRequest request = HttpRequest.newBuilder()\n            .uri(URI.create(BASE_URL + \"{path}\"))\n            .header(\"Content-Type\", \"application/json\")\n            .method(\"{method}\", HttpRequest.BodyPublishers.ofString(body))\n            .build();\n",
+                path = route.path,
+                method = method_str,
+            ));
+        }
+        code.push_str("        return client.send(request, HttpResponse.BodyHandlers.ofString()).body();\n");
+        code.push_str("    }\n\n");
+    }
+
+    code.push_str("}\n");
+    code
+}
+
+fn generate_go_sdk(routes: &[RouteWithBinding]) -> String {
+    let mut code = String::new();
+    code.push_str("// Auto-generated API-Anything SDK for Go\n");
+    code.push_str("// Generated from active route definitions\n\n");
+    code.push_str("package apianything\n\n");
+    code.push_str("import (\n\t\"bytes\"\n\t\"encoding/json\"\n\t\"io\"\n\t\"net/http\"\n)\n\n");
+    code.push_str("const BaseURL = \"http://localhost:8080/gw\"\n\n");
+
+    for route in routes {
+        let fn_name = route_to_fn_name(&route.method, &route.path);
+        // Go 函数名首字母大写以导出
+        let fn_name = fn_name.chars().next().map(|c| c.to_uppercase().to_string()).unwrap_or_default() + &fn_name[1..];
+        let method_str = format!("{:?}", route.method).to_uppercase();
+
+        code.push_str(&format!(
+            "func {fn_name}(body map[string]interface{{}}) (map[string]interface{{}}, error) {{\n"
+        ));
+
+        if method_str == "GET" || method_str == "DELETE" {
+            code.push_str(&format!(
+                "\treq, err := http.NewRequest(\"{method}\", BaseURL+\"{path}\", nil)\n",
+                method = method_str,
+                path = route.path,
+            ));
+        } else {
+            code.push_str("\tdata, _ := json.Marshal(body)\n");
+            code.push_str(&format!(
+                "\treq, err := http.NewRequest(\"{method}\", BaseURL+\"{path}\", bytes.NewReader(data))\n",
+                method = method_str,
+                path = route.path,
+            ));
+            code.push_str("\treq.Header.Set(\"Content-Type\", \"application/json\")\n");
+        }
+        code.push_str("\tif err != nil { return nil, err }\n");
+        code.push_str("\tresp, err := http.DefaultClient.Do(req)\n");
+        code.push_str("\tif err != nil { return nil, err }\n");
+        code.push_str("\tdefer resp.Body.Close()\n");
+        code.push_str("\trespBody, _ := io.ReadAll(resp.Body)\n");
+        code.push_str("\tvar result map[string]interface{}\n");
+        code.push_str("\tjson.Unmarshal(respBody, &result)\n");
+        code.push_str("\treturn result, nil\n}\n\n");
+    }
+
+    code
 }
 
 fn build_agent_prompt(routes: &[RouteWithBinding]) -> String {
