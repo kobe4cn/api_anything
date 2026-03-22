@@ -4,4 +4,5 @@ pub mod semaphore;
 
 pub use rate_limiter::RateLimiter;
 pub use circuit_breaker::CircuitBreaker;
+pub use circuit_breaker::CircuitState;
 pub use semaphore::ConcurrencySemaphore;
