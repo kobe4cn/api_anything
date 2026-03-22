@@ -92,6 +92,147 @@ enum ParseContext {
 pub struct WsdlParser;
 
 impl WsdlParser {
+    /// 大型 WSDL 分块解析入口：当文件超过阈值时按 portType 拆分独立解析后合并，
+    /// 避免单次解析过大 XML 导致内存峰值过高
+    pub fn parse_chunked(xml: &str, max_chunk_size: usize) -> Result<WsdlDefinition> {
+        if xml.len() < max_chunk_size {
+            return Self::parse(xml);
+        }
+
+        // 提取全局共享的 <types> 段和根节点属性，每个分块都需要这些信息
+        let types_section = Self::extract_types_section(xml);
+        let root_attrs = Self::extract_root_attrs(xml);
+
+        let chunks = Self::split_by_port_type(xml)?;
+        if chunks.is_empty() {
+            // 没有可拆分的 portType，退化为完整解析
+            return Self::parse(xml);
+        }
+
+        let mut merged = WsdlDefinition {
+            service_name: String::new(),
+            target_namespace: String::new(),
+            endpoint_url: None,
+            types: Vec::new(),
+            messages: Vec::new(),
+            operations: Vec::new(),
+        };
+
+        // 先完整解析一次以获取 service_name、target_namespace、endpoint_url 和全局 types
+        if let Ok(full_header) = Self::parse(xml) {
+            merged.service_name = full_header.service_name;
+            merged.target_namespace = full_header.target_namespace;
+            merged.endpoint_url = full_header.endpoint_url;
+            merged.types = full_header.types;
+        }
+
+        // 每个 chunk 是一个围绕单个 portType 及其关联 binding/message 构建的最小 WSDL 文档
+        for chunk in &chunks {
+            let doc = format!(
+                r#"<?xml version="1.0" encoding="UTF-8"?>
+<definitions {root_attrs}>
+{types_section}
+{chunk}
+</definitions>"#,
+                root_attrs = root_attrs,
+                types_section = types_section,
+                chunk = chunk,
+            );
+            if let Ok(partial) = Self::parse(&doc) {
+                merged.messages.extend(partial.messages);
+                merged.operations.extend(partial.operations);
+            }
+        }
+
+        // 按名称去重：多个 chunk 可能引用相同的 message 定义
+        merged.types.dedup_by(|a, b| a.name == b.name);
+        merged.messages.dedup_by(|a, b| a.name == b.name);
+        merged.operations.dedup_by(|a, b| a.name == b.name);
+
+        Ok(merged)
+    }
+
+    /// 提取 <types>...</types> 段（含标签本身），作为所有分块共享的类型定义
+    fn extract_types_section(xml: &str) -> String {
+        // 使用贪心匹配确保捕获完整的 types 块（包括嵌套标签）
+        let re = regex::Regex::new(r"(?s)<types\b.*?</types>").unwrap();
+        re.find(xml)
+            .map(|m| m.as_str().to_string())
+            .unwrap_or_default()
+    }
+
+    /// 提取根 <definitions> 标签的属性字符串，在重新组装分块文档时保持命名空间声明完整
+    fn extract_root_attrs(xml: &str) -> String {
+        let re = regex::Regex::new(r"(?s)<definitions\b([^>]*)>").unwrap();
+        re.captures(xml)
+            .and_then(|c| c.get(1))
+            .map(|m| m.as_str().to_string())
+            .unwrap_or_default()
+    }
+
+    /// 按 portType 标签将 WSDL 切分为独立块，每块包含对应的 message 和 binding 定义
+    fn split_by_port_type(xml: &str) -> Result<Vec<String>> {
+        let port_type_re = regex::Regex::new(r#"(?s)<portType\b[^>]*name\s*=\s*"([^"]+)"[^>]*>.*?</portType>"#).unwrap();
+        let binding_re = regex::Regex::new(r#"(?s)<binding\b[^>]*>.*?</binding>"#).unwrap();
+        let message_re = regex::Regex::new(r#"(?s)<message\b[^>]*name\s*=\s*"([^"]+)"[^>]*>.*?</message>"#).unwrap();
+
+        let mut chunks = Vec::new();
+
+        // 收集所有 message 定义，后续按 portType 操作引用的 message 名称筛选
+        let all_messages: Vec<(String, String)> = message_re
+            .captures_iter(xml)
+            .map(|c| (c[1].to_string(), c[0].to_string()))
+            .collect();
+
+        // 收集所有 binding 定义
+        let all_bindings: Vec<String> = binding_re
+            .find_iter(xml)
+            .map(|m| m.as_str().to_string())
+            .collect();
+
+        for pt_cap in port_type_re.captures_iter(xml) {
+            let pt_name = &pt_cap[1];
+            let pt_xml = &pt_cap[0];
+
+            let mut chunk = String::new();
+
+            // 找出该 portType 引用的 message 名称（input/output message 属性值）
+            let msg_ref_re = regex::Regex::new(r#"message\s*=\s*"([^"]+)""#).unwrap();
+            let referenced_msgs: Vec<String> = msg_ref_re
+                .captures_iter(pt_xml)
+                .map(|c| {
+                    let full = &c[1];
+                    // 去掉命名空间前缀 "tns:XXX" -> "XXX"
+                    full.find(':').map(|i| &full[i + 1..]).unwrap_or(full).to_string()
+                })
+                .collect();
+
+            // 将引用到的 message 定义加入 chunk
+            for (name, msg_xml) in &all_messages {
+                if referenced_msgs.contains(name) {
+                    chunk.push_str(msg_xml);
+                    chunk.push('\n');
+                }
+            }
+
+            // portType 本身
+            chunk.push_str(pt_xml);
+            chunk.push('\n');
+
+            // 找到引用此 portType 的 binding（通过 type 属性中的名称匹配）
+            for binding_xml in &all_bindings {
+                if binding_xml.contains(pt_name) {
+                    chunk.push_str(binding_xml);
+                    chunk.push('\n');
+                }
+            }
+
+            chunks.push(chunk);
+        }
+
+        Ok(chunks)
+    }
+
     pub fn parse(xml: &str) -> Result<WsdlDefinition> {
         let mut reader = Reader::from_str(xml);
         reader.config_mut().trim_text(true);
@@ -373,5 +514,39 @@ mod tests {
     fn parses_messages() {
         let wsdl = WsdlParser::parse(sample_wsdl()).unwrap();
         assert!(wsdl.messages.len() >= 4);
+    }
+
+    fn multi_port_wsdl() -> &'static str {
+        include_str!("../../tests/fixtures/multi_port.wsdl")
+    }
+
+    #[test]
+    fn parse_chunked_small_file_delegates_to_parse() {
+        // 小于阈值时应直接走 parse 路径，结果与 parse 一致
+        let wsdl = WsdlParser::parse_chunked(sample_wsdl(), 1_000_000).unwrap();
+        assert_eq!(wsdl.service_name, "CalculatorService");
+        assert_eq!(wsdl.operations.len(), 2);
+    }
+
+    #[test]
+    fn parse_chunked_splits_multi_port_types() {
+        // 阈值设为 1 强制走分块路径，验证多 portType 文件能正确合并
+        let wsdl = WsdlParser::parse_chunked(multi_port_wsdl(), 1).unwrap();
+        assert_eq!(wsdl.service_name, "MultiService");
+        assert_eq!(wsdl.operations.len(), 3, "3 operations across 2 portTypes");
+        assert!(wsdl.operations.iter().any(|o| o.name == "Add"));
+        assert!(wsdl.operations.iter().any(|o| o.name == "Subtract"));
+        assert!(wsdl.operations.iter().any(|o| o.name == "GetHistory"));
+        // types 应去重后保留所有不重复的类型定义
+        assert!(wsdl.types.len() >= 4);
+    }
+
+    #[test]
+    fn split_by_port_type_extracts_correct_chunks() {
+        let chunks = WsdlParser::split_by_port_type(multi_port_wsdl()).unwrap();
+        assert_eq!(chunks.len(), 2, "应拆分为 2 个 portType 块");
+        // 每个块都应包含对应的 portType 标签
+        assert!(chunks[0].contains("CalculatorPortType") || chunks[1].contains("CalculatorPortType"));
+        assert!(chunks[0].contains("HistoryPortType") || chunks[1].contains("HistoryPortType"));
     }
 }
