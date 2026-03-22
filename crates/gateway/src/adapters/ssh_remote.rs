@@ -1,10 +1,16 @@
+// ssh_pool 模块独立于 adapters/mod.rs 声明，避免修改 mod.rs 引发并行冲突
+#[path = "ssh_pool.rs"]
+pub mod ssh_pool;
+
 use crate::adapter::{BoxFuture, ProtocolAdapter};
 use crate::output_parser::{OutputFormat, OutputParser};
+use ssh_pool::{SshAuth, SshCommandOutput, SshConnectionPool};
 use crate::types::*;
 use api_anything_common::error::AppError;
 use axum::http::{HeaderMap, Method};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Instant;
 use tokio::process::Command;
 
@@ -23,11 +29,21 @@ pub struct SshConfig {
 
 pub struct SshAdapter {
     config: SshConfig,
+    /// 可选的连接池：设置后使用 russh 池化连接，未设置时回退到系统 ssh 命令
+    pool: Option<Arc<SshConnectionPool>>,
 }
 
 impl SshAdapter {
     pub fn new(config: SshConfig) -> Self {
-        Self { config }
+        Self { config, pool: None }
+    }
+
+    /// 创建带连接池的 SshAdapter，启用 russh 原生 SSH 连接复用
+    pub fn with_pool(config: SshConfig, pool: Arc<SshConnectionPool>) -> Self {
+        Self {
+            config,
+            pool: Some(pool),
+        }
     }
 
     /// 将命令模板中的 {param} 占位符替换为实际参数值；
@@ -38,6 +54,67 @@ impl SshAdapter {
             cmd = cmd.replace(&format!("{{{}}}", key), val);
         }
         cmd
+    }
+
+    /// 将 SshConfig 中的 identity_file 转换为连接池使用的认证方式
+    fn ssh_auth(&self) -> SshAuth {
+        match &self.config.identity_file {
+            Some(path) => SshAuth::KeyFile {
+                path: path.clone(),
+                passphrase: None,
+            },
+            None => SshAuth::DefaultKey,
+        }
+    }
+
+    /// 使用 russh 连接池执行命令（首选路径）
+    async fn execute_via_pool(
+        &self,
+        pool: &SshConnectionPool,
+        command: &str,
+    ) -> Result<SshCommandOutput, AppError> {
+        let auth = self.ssh_auth();
+
+        pool.execute(
+            &self.config.host,
+            self.config.port,
+            &self.config.user,
+            &auth,
+            command,
+        )
+        .await
+        .map_err(|e| AppError::BackendUnavailable(format!("SSH pool error: {e}")))
+    }
+
+    /// 回退路径：使用系统 ssh 命令执行（与原实现一致）
+    async fn execute_via_system_ssh(&self, command: &str) -> Result<SshCommandOutput, AppError> {
+        let mut cmd = Command::new("ssh");
+        cmd.arg("-o")
+            .arg("StrictHostKeyChecking=accept-new")
+            .arg("-o")
+            .arg("ConnectTimeout=10")
+            .arg("-o")
+            .arg("BatchMode=yes")
+            .arg("-p")
+            .arg(self.config.port.to_string());
+
+        if let Some(key_path) = &self.config.identity_file {
+            cmd.arg("-i").arg(key_path);
+        }
+
+        cmd.arg(format!("{}@{}", self.config.user, self.config.host))
+            .arg(command);
+
+        let output = cmd
+            .output()
+            .await
+            .map_err(|e| AppError::BackendUnavailable(format!("SSH execution failed: {e}")))?;
+
+        Ok(SshCommandOutput {
+            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+            exit_code: output.status.code().unwrap_or(-1),
+        })
     }
 }
 
@@ -76,35 +153,22 @@ impl ProtocolAdapter for SshAdapter {
             let command = req.protocol_params.get("command")
                 .ok_or_else(|| AppError::Internal("Missing command in protocol_params".into()))?;
 
-            // 使用系统 ssh 二进制而非 russh/ssh2-rs，避免引入 C 依赖，
-            // 在 macOS 和 Linux 上均能可靠运行
-            let mut cmd = Command::new("ssh");
-            cmd.arg("-o").arg("StrictHostKeyChecking=accept-new")
-               .arg("-o").arg("ConnectTimeout=10")
-               // BatchMode=yes 禁止交互式密码提示，确保命令在超时前快速失败而非挂起
-               .arg("-o").arg("BatchMode=yes")
-               .arg("-p").arg(self.config.port.to_string());
+            // 优先使用 russh 连接池（避免重复 TCP+SSH 握手），
+            // 无连接池时回退到系统 ssh 命令
+            let output = if let Some(pool) = &self.pool {
+                self.execute_via_pool(pool, command).await?
+            } else {
+                self.execute_via_system_ssh(command).await?
+            };
 
-            if let Some(key_path) = &self.config.identity_file {
-                cmd.arg("-i").arg(key_path);
-            }
-
-            cmd.arg(format!("{}@{}", self.config.user, self.config.host))
-               .arg(command);
-
-            let output = cmd.output().await
-                .map_err(|e| AppError::BackendUnavailable(format!("SSH execution failed: {e}")))?;
-
-            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-            let exit_code = output.status.code().unwrap_or(-1);
+            let exit_code = output.exit_code;
 
             // SSH 特殊退出码：255 表示 SSH 连接本身失败（非远端命令错误），
             // 将其映射为 502 Bad Gateway 以区别于远端命令失败的 500
             let body = serde_json::json!({
                 "exit_code": exit_code,
-                "stdout": stdout,
-                "stderr": stderr,
+                "stdout": output.stdout,
+                "stderr": output.stderr,
             });
 
             Ok(BackendResponse {
