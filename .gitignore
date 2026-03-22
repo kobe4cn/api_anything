@@ -25,3 +25,4 @@ artifacts/
 web/node_modules/
 web/dist/
 test-reports/
+generated/
