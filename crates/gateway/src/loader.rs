@@ -1,4 +1,5 @@
 use crate::adapters::cli_process::{CliAdapter, CliConfig};
+use crate::adapters::pty_expect::{PtyAdapter, PtyConfig};
 use crate::adapters::soap::{SoapAdapter, SoapConfig};
 use crate::adapters::ssh_remote::SshAdapter;
 use crate::dispatcher::{BackendDispatcher, ProtectionStack};
@@ -153,6 +154,42 @@ fn build_ssh_config(route: &RouteWithBinding) -> Result<crate::adapters::ssh_rem
     })
 }
 
+/// 从 endpoint_config JSON 构造 PtyConfig；
+/// init_commands 为可选数组，timeout_ms 缺失时以保护栈超时为准，
+/// 这里直接读取配置值兜底为 300s（与 PTY 协议的默认超时一致）
+fn build_pty_config(route: &RouteWithBinding) -> Result<PtyConfig, anyhow::Error> {
+    let ec = &route.endpoint_config;
+    Ok(PtyConfig {
+        program: ec["program"].as_str().unwrap_or("").to_string(),
+        args: ec["args"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default(),
+        prompt_pattern: ec["prompt_pattern"].as_str().unwrap_or(r"\$\s*$").to_string(),
+        command_template: ec["command_template"].as_str().unwrap_or("").to_string(),
+        output_format: parse_output_format(ec.get("output_format")),
+        init_commands: ec["init_commands"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default(),
+        // timeout_ms 从路由超时继承；为零时兜底使用 PTY 协议默认的 300s，
+        // 确保长时间运行的设备命令不会被过早截断
+        timeout_ms: if route.timeout_ms > 0 {
+            route.timeout_ms as u64
+        } else {
+            300_000
+        },
+    })
+}
+
 /// 根据协议类型构造协议感知的保护栈；
 /// 不同协议的行为差异显著（CLI 进程比 SOAP HTTP 慢得多、并发度更低），
 /// 硬编码在 SOAP 时代的通用默认值会导致 CLI 路由的保护策略失当
@@ -251,6 +288,19 @@ impl RouteLoader {
                                 route_id = %route.route_id,
                                 error = %e,
                                 "Skipping SSH route: invalid endpoint_config"
+                            );
+                            continue;
+                        }
+                    }
+                }
+                ProtocolType::Pty => {
+                    match build_pty_config(route) {
+                        Ok(cfg) => Box::new(PtyAdapter::new(cfg)),
+                        Err(e) => {
+                            tracing::warn!(
+                                route_id = %route.route_id,
+                                error = %e,
+                                "Skipping PTY route: invalid endpoint_config"
                             );
                             continue;
                         }
