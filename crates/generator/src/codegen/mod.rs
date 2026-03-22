@@ -1,5 +1,6 @@
 pub mod compiler;
 pub mod prompts;
+pub mod reference_plugins;
 pub mod scaffold;
 
 use crate::llm::client::LlmClient;
@@ -78,18 +79,19 @@ impl<'a> CodegenEngine<'a> {
             .complete(prompts::SYSTEM_PROMPT, &prompt)
             .await?;
         let source_code = extract_rust_code(&raw_response);
+        let source_code = sanitize_rust_code(&source_code);
 
         // 安全检查：警告生成代码中的 unsafe 块（不阻断，仅记录）
         if source_code.contains("unsafe") {
             tracing::warn!("Generated code contains 'unsafe' blocks — review recommended");
         }
 
-        // Stage 3: 编译（失败时 LLM 自动修正，最多重试 3 次）
+        // Stage 3: 编译（失败时 LLM 自动修正，最多重试 5 次以提高成功率）
         tracing::info!("Stage 3: Compiling generated code to plugin");
         scaffold::create_plugin_crate(&crate_dir, &crate_name, &source_code, &self.sdk_path)?;
 
         let (plugin_path, final_code) =
-            compiler::compile_with_llm_fix(&crate_dir, &source_code, self.llm, 3).await?;
+            compiler::compile_with_llm_fix(&crate_dir, &source_code, self.llm, 5).await?;
 
         // Stage 4: LLM 生成影子测试
         tracing::info!("Stage 4: Generating shadow tests");
@@ -134,10 +136,69 @@ impl<'a> CodegenEngine<'a> {
             plugin_path,
             source_code: final_code,
             openapi_spec: openapi,
-            test_code: extract_rust_code(&test_code),
+            test_code: sanitize_rust_code(&extract_rust_code(&test_code)),
             routes,
         })
     }
+}
+
+/// 清洗 LLM 生成的代码：去除代码前后的自然语言文本，替换 Unicode 智引号为 ASCII。
+///
+/// LLM 修复编译错误时经常在代码前后附带解释性文本（"Here's the fix..."），
+/// 以及使用 Unicode 智引号（\u{201C}\u{201D}）代替 ASCII 引号，
+/// 这两类问题会导致 rustc 报 "unknown start of token" 或语法错误。
+pub fn sanitize_rust_code(code: &str) -> String {
+    let mut result = String::new();
+    let mut in_code = false;
+
+    for line in code.lines() {
+        // 先清洗不可见字符和智引号，再做关键字检测，
+        // 避免 BOM 等前缀导致 starts_with 匹配失败
+        let cleaned = line
+            .replace('\u{2018}', "'")  // left single quote
+            .replace('\u{2019}', "'")  // right single quote
+            .replace('\u{201C}', "\"") // left double quote
+            .replace('\u{201D}', "\"") // right double quote
+            .replace('\u{2060}', "")   // word joiner (零宽)
+            .replace('\u{FEFF}', "");  // BOM
+
+        let trimmed = cleaned.trim();
+
+        // 尚未进入 Rust 代码区域时，检测是否为代码起始行
+        if !in_code {
+            if trimmed.starts_with("use ")
+                || trimmed.starts_with("fn ")
+                || trimmed.starts_with("pub ")
+                || trimmed.starts_with("struct ")
+                || trimmed.starts_with("impl ")
+                || trimmed.starts_with("mod ")
+                || trimmed.starts_with("const ")
+                || trimmed.starts_with("static ")
+                || trimmed.starts_with("type ")
+                || trimmed.starts_with("#[")
+                || trimmed.starts_with("#![")
+                || trimmed.starts_with("extern ")
+                || trimmed.starts_with("export_plugin!")
+                || trimmed.starts_with("//")
+                || trimmed.starts_with("/*")
+            {
+                in_code = true;
+            } else {
+                // 跳过代码前的自然语言（"Here's the corrected code:" 等）
+                continue;
+            }
+        }
+
+        result.push_str(&cleaned);
+        result.push('\n');
+    }
+
+    // 如果没有检测到任何 Rust 代码起始标志，返回原文（可能整段都是纯代码）
+    if result.trim().is_empty() {
+        return code.to_string();
+    }
+
+    result
 }
 
 /// 从 LLM 响应文本中提取 ```rust ... ``` 代码块。
@@ -371,6 +432,58 @@ mod tests {
         assert_eq!(spec["openapi"], "3.0.3");
         assert!(spec["info"]["title"].as_str().unwrap().contains("Calculator"));
         assert!(spec["paths"]["/gw/api/v1/calc/add"]["post"].is_object());
+    }
+
+    #[test]
+    fn sanitize_removes_natural_language_prefix() {
+        let input = "Here's the corrected code:\n\n```rust\nuse serde::Serialize;\n```\n\nThe fix was...";
+        let result = sanitize_rust_code(&extract_rust_code(input));
+        assert!(result.contains("use serde::Serialize"));
+        assert!(!result.contains("Here's"));
+        assert!(!result.contains("The fix"));
+    }
+
+    #[test]
+    fn sanitize_replaces_unicode_quotes() {
+        let input = "use serde::Serialize;\nlet x = \u{201C}hello\u{201D};";
+        let result = sanitize_rust_code(input);
+        assert!(result.contains("\"hello\""));
+        assert!(!result.contains('\u{201C}'));
+        assert!(!result.contains('\u{201D}'));
+    }
+
+    #[test]
+    fn sanitize_preserves_pure_rust_code() {
+        let input = "use serde::Serialize;\n\nfn main() {\n    println!(\"hello\");\n}";
+        let result = sanitize_rust_code(input);
+        assert_eq!(result.trim(), input.trim());
+    }
+
+    #[test]
+    fn sanitize_handles_code_after_explanation() {
+        // LLM 修复错误时经常先解释再给代码
+        let input = "The issue was that the type didn't match.\nI've fixed it below:\n\nuse std::io;\n\nfn main() {\n    println!(\"fixed\");\n}";
+        let result = sanitize_rust_code(input);
+        assert!(result.contains("use std::io;"));
+        assert!(result.contains("fn main()"));
+        assert!(!result.contains("The issue"));
+        assert!(!result.contains("I've fixed"));
+    }
+
+    #[test]
+    fn sanitize_removes_bom_and_word_joiner() {
+        let input = "\u{FEFF}use serde::Serialize;\nlet x = \"a\u{2060}b\";";
+        let result = sanitize_rust_code(input);
+        assert!(!result.contains('\u{FEFF}'));
+        assert!(!result.contains('\u{2060}'));
+    }
+
+    #[test]
+    fn sanitize_returns_original_if_no_rust_detected() {
+        // 纯自然语言输入应原样返回（后续编译会报错，但不会丢数据）
+        let input = "This is just a plain English explanation with no code.";
+        let result = sanitize_rust_code(input);
+        assert_eq!(result, input);
     }
 
     #[test]

@@ -1,0 +1,851 @@
+{
+  "info": {
+    "title": "test-odata-product-service API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/gw/categories": {
+      "get": {
+        "operationId": "listCategories",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "description": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "integer"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Retrieve a list of all categories"
+      },
+      "post": {
+        "operationId": "createCategory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Create a new category"
+      }
+    },
+    "/gw/categories/{id}": {
+      "get": {
+        "operationId": "getCategory",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Retrieve a specific category by ID"
+      }
+    },
+    "/gw/orders": {
+      "get": {
+        "operationId": "listOrders",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "customer_name": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "order_date": {
+                        "type": "string"
+                      },
+                      "shipping_address": {
+                        "type": "object"
+                      },
+                      "total_amount": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Retrieve a list of all orders"
+      },
+      "post": {
+        "operationId": "createOrder",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "customer_name": {
+                    "type": "string"
+                  },
+                  "order_date": {
+                    "type": "string"
+                  },
+                  "shipping_address": {
+                    "type": "object"
+                  },
+                  "total_amount": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "customer_name",
+                  "total_amount",
+                  "order_date"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "customer_name": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "order_date": {
+                      "type": "string"
+                    },
+                    "total_amount": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Create a new order"
+      }
+    },
+    "/gw/orders/{id}": {
+      "get": {
+        "operationId": "getOrder",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "customer_name": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "order_date": {
+                      "type": "string"
+                    },
+                    "shipping_address": {
+                      "type": "object"
+                    },
+                    "total_amount": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Retrieve a specific order by ID"
+      }
+    },
+    "/gw/products": {
+      "get": {
+        "operationId": "listProducts",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "integer"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "price": {
+                        "type": "number"
+                      },
+                      "status": {
+                        "enum": [
+                          "Active",
+                          "Discontinued",
+                          "OutOfStock"
+                        ],
+                        "type": "string"
+                      },
+                      "tags": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Retrieve a list of all products"
+      },
+      "post": {
+        "operationId": "createProduct",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "enum": [
+                      "Active",
+                      "Discontinued",
+                      "OutOfStock"
+                    ],
+                    "type": "string"
+                  },
+                  "tags": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "name",
+                  "price",
+                  "status"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "price": {
+                      "type": "number"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Create a new product"
+      }
+    },
+    "/gw/products/{id}": {
+      "delete": {
+        "operationId": "deleteProduct",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Delete a product by ID"
+      },
+      "get": {
+        "operationId": "getProduct",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "price": {
+                      "type": "number"
+                    },
+                    "status": {
+                      "enum": [
+                        "Active",
+                        "Discontinued",
+                        "OutOfStock"
+                      ],
+                      "type": "string"
+                    },
+                    "tags": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Retrieve a specific product by ID"
+      },
+      "patch": {
+        "operationId": "patchProduct",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "price": {
+                      "type": "number"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Partially update an existing product"
+      },
+      "put": {
+        "operationId": "updateProduct",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "price": {
+                      "type": "number"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Fully update an existing product"
+      }
+    },
+    "/gw/suppliers": {
+      "get": {
+        "operationId": "listSuppliers",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "address": {
+                        "type": "object"
+                      },
+                      "contact_email": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "integer"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Retrieve a list of all suppliers"
+      },
+      "post": {
+        "operationId": "createSupplier",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "address": {
+                    "type": "object"
+                  },
+                  "contact_email": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "contact_email": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Create a new supplier"
+      }
+    },
+    "/gw/suppliers/{id}": {
+      "get": {
+        "operationId": "getSupplier",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "address": {
+                      "type": "object"
+                    },
+                    "contact_email": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Retrieve a specific supplier by ID"
+      }
+    }
+  }
+}

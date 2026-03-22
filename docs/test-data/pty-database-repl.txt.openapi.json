@@ -4,5 +4,146 @@
     "version": "1.0.0"
   },
   "openapi": "3.0.3",
-  "paths": {}
+  "paths": {
+    "/gw/processlist": {
+      "get": {
+        "operationId": "getProcessList",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "output": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Returns the current MySQL server process list."
+      }
+    },
+    "/gw/tables/status": {
+      "get": {
+        "operationId": "getTableStatus",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "output": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Returns status information for a specific database table."
+      }
+    },
+    "/gw/users/active/count": {
+      "get": {
+        "operationId": "getActiveUserCount",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "output": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Returns the total count of users with active status."
+      }
+    },
+    "/gw/users/recent": {
+      "get": {
+        "operationId": "getRecentUsers",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "output": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Returns a list of recently created users ordered by creation date."
+      }
+    }
+  }
 }

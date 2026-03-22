@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::codegen::extract_rust_code;
+use crate::codegen::{extract_rust_code, sanitize_rust_code};
 use crate::codegen::scaffold;
 use crate::llm::client::LlmClient;
 
@@ -79,23 +79,42 @@ pub async fn compile_with_llm_fix(
                 );
 
                 let fix_prompt = format!(
-                    "The following Rust code failed to compile:\n\n\
-                     ```rust\n{}\n```\n\n\
-                     Compilation error:\n```\n{}\n```\n\n\
-                     Fix the code and return the COMPLETE corrected code in a ```rust code block. \
-                     Do not omit any part of the code.",
+                    r#"The following Rust plugin code failed to compile. Fix ALL errors and return ONLY the complete corrected Rust source code.
+
+CRITICAL RULES:
+1. Return ONLY Rust code - NO explanations, NO natural language text
+2. The code must be wrapped in ```rust ... ``` markers
+3. Do NOT include any text before or after the code block
+4. Do NOT add comments like "Here's the fix" or "The issue was..."
+5. The entire response must be valid Rust code
+6. Keep all existing functionality, only fix the compilation errors
+7. Make sure all strings use ASCII quotes (not Unicode smart quotes)
+
+Failed code:
+```rust
+{}
+```
+
+Compilation errors:
+```
+{}
+```
+
+Return the COMPLETE fixed code (not just the changed parts):"#,
                     current_code, e
                 );
 
                 let fixed = llm
                     .complete(
-                        "You are a Rust expert. Fix the compilation error in the plugin code. \
-                         Return the complete fixed code in a ```rust code block.",
+                        "You are a Rust expert. Fix compilation errors in plugin code. \
+                         Return ONLY the complete fixed code in a ```rust code block. \
+                         NO explanations, NO text outside the code block.",
                         &fix_prompt,
                     )
                     .await?;
 
-                current_code = extract_rust_code(&fixed);
+                // 提取代码块后再清洗，去除 LLM 可能附带的自然语言和 Unicode 特殊字符
+                current_code = sanitize_rust_code(&extract_rust_code(&fixed));
             }
             Err(e) => return Err(e),
         }

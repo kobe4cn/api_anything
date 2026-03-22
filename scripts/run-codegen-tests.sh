@@ -53,6 +53,14 @@ fi
 
 # 编译
 echo ""
+echo "--- 清理旧测试数据 ---"
+podman exec docker-postgres-1 psql -U api_anything -d api_anything -c "
+DELETE FROM delivery_records; DELETE FROM idempotency_keys;
+DELETE FROM recorded_interactions; DELETE FROM sandbox_sessions;
+DELETE FROM routes; DELETE FROM backend_bindings; DELETE FROM contracts;
+DELETE FROM projects WHERE name LIKE 'test-%';
+" 2>/dev/null || psql "$DATABASE_URL" -c "DELETE FROM projects WHERE name LIKE 'test-%'" 2>/dev/null || true
+
 echo "--- 编译项目 ---"
 cargo build -p api-anything-cli --release 2>&1 | tail -3
 CLI="./target/release/api-anything-cli"

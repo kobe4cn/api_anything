@@ -1,9 +1,19 @@
 /// 系统 prompt：定义 LLM 的角色和输出格式要求。
-/// 明确列出可用依赖，避免 LLM 引入项目中不存在的 crate 导致编译失败
+/// 明确列出可用依赖，避免 LLM 引入项目中不存在的 crate 导致编译失败。
+/// 强调纯代码输出规则，防止 LLM 在响应中混入自然语言导致编译失败
 pub const SYSTEM_PROMPT: &str = r#"
 You are an expert Rust code generator for the API-Anything platform.
 Your job is to generate a complete Rust plugin (.so dynamic library) that converts
 a legacy system interface into a modern REST API.
+
+CRITICAL OUTPUT RULES (violation will cause compilation failure):
+1. Return ONLY valid Rust code wrapped in a single ```rust code block
+2. Do NOT include ANY text outside the code block — no explanations, no "Here's the code", no notes
+3. Use ONLY ASCII characters — no Unicode smart quotes (" " ' '), no special dashes (—), no BOM
+4. The code MUST compile without errors on first attempt
+5. Include ALL necessary use statements at the top of the file
+6. Every string literal must use standard ASCII double quotes (")
+7. Every char literal must use standard ASCII single quotes (')
 
 The plugin must:
 1. Use the api_anything_plugin_sdk crate (PluginInfo, PluginRequest, PluginResponse, export_plugin!)
@@ -18,8 +28,6 @@ IMPORTANT CONSTRAINTS:
 - Never use tokio::runtime::Runtime inside the handler — just use blocking calls.
 - All plugin_handle calls receive JSON-serialized PluginRequest and must return JSON-serialized PluginResponse.
 
-Output ONLY valid Rust code in a single ```rust code block. No explanations outside the code block.
-
 The code must compile with these dependencies (and ONLY these):
 - api_anything_plugin_sdk (provides: PluginInfo, PluginRequest, PluginResponse, export_plugin!)
 - serde, serde_json (for serialization, with "derive" feature)
@@ -27,6 +35,41 @@ The code must compile with these dependencies (and ONLY these):
 - quick-xml (with "serialize" feature, for XML parsing if needed)
 - regex (for text parsing)
 - tracing (for observability)
+
+EXACT TYPE DEFINITIONS from api_anything_plugin_sdk (DO NOT deviate from these types):
+```rust
+pub struct PluginInfo {
+    pub name: String,          // NOT Option<String>
+    pub version: String,       // NOT Option<String>
+    pub protocol: String,      // NOT Option<String>
+    pub description: String,   // NOT Option<String>
+}
+
+pub struct PluginRequest {
+    pub method: String,                         // e.g. "GET", "POST" — always present, NOT Option
+    pub path: String,                           // e.g. "/api/v1/users" — always present, NOT Option
+    pub headers: HashMap<String, String>,       // always present (may be empty)
+    pub query_params: HashMap<String, String>,  // always present (may be empty)
+    pub path_params: HashMap<String, String>,   // always present (may be empty)
+    pub body: Option<serde_json::Value>,        // ONLY body is Optional
+}
+
+pub struct PluginResponse {
+    pub status_code: u16,
+    pub headers: HashMap<String, String>,
+    pub body: serde_json::Value,
+}
+
+// Use export_plugin! macro at the end of the file:
+export_plugin!(handle, PluginInfo {
+    name: "my-plugin".to_string(),
+    version: "1.0.0".to_string(),
+    protocol: "soap".to_string(),
+    description: "My plugin".to_string(),
+});
+```
+
+KEY: All fields in PluginRequest are NOT Option except `body`. Do NOT use .unwrap() or .unwrap_or() on path, method, headers, query_params, or path_params — they are always present.
 "#;
 
 /// 根据接口类型构建代码生成 prompt，每种接口类型使用专门优化的 prompt 模板
@@ -69,32 +112,15 @@ Requirements:
 6. The handler function signature must be: fn handle(req: PluginRequest) -> PluginResponse
 7. Route requests based on req.path (e.g., "/add" for an Add operation)
 
-Example structure:
+REFERENCE IMPLEMENTATION (this code compiles successfully - use it as a structural template):
 ```rust
-use api_anything_plugin_sdk::*;
-use serde::{{Serialize, Deserialize}};
-
-#[derive(Serialize, Deserialize)]
-struct AddRequest {{ a: i32, b: i32 }}
-
-#[derive(Serialize, Deserialize)]
-struct AddResponse {{ result: i32 }}
-
-#[tracing::instrument(skip(req))]
-fn handle(req: PluginRequest) -> PluginResponse {{
-    // Route based on req.path
-    // Build SOAP envelope, send request, parse response
-    // Return PluginResponse
-}}
-
-export_plugin!(handle, PluginInfo {{
-    name: "calculator-soap".to_string(),
-    version: "1.0.0".to_string(),
-    protocol: "soap".to_string(),
-    description: "SOAP Calculator service".to_string(),
-}});
+{reference}
 ```
-"#
+
+Now generate the SPECIFIC plugin for the WSDL above, adapting the reference implementation.
+Remember: return ONLY code in a ```rust block, NO explanations.
+"#,
+        reference = super::reference_plugins::SOAP_REFERENCE
     )
 }
 
@@ -121,7 +147,16 @@ Requirements:
 5. Set PluginInfo with protocol="odata"
 6. Handle OData error responses (error.code, error.message)
 7. Route based on req.method and req.path
-"#
+
+REFERENCE IMPLEMENTATION (this code compiles successfully - use it as a structural template):
+```rust
+{reference}
+```
+
+Now generate the SPECIFIC plugin for the OData service above, adapting the reference implementation.
+Remember: return ONLY code in a ```rust block, NO explanations.
+"#,
+        reference = super::reference_plugins::ODATA_REFERENCE
     )
 }
 
@@ -141,7 +176,16 @@ Requirements:
 3. Transform responses if needed (field mapping, type conversion)
 4. Set PluginInfo with protocol="rest"
 5. Route based on req.method and req.path
-"#
+
+REFERENCE IMPLEMENTATION (this code compiles successfully - use it as a structural template):
+```rust
+{reference}
+```
+
+Now generate the SPECIFIC plugin for the OpenAPI spec above, adapting the reference implementation.
+Remember: return ONLY code in a ```rust block, NO explanations.
+"#,
+        reference = super::reference_plugins::OPENAPI_REFERENCE
     )
 }
 
@@ -165,7 +209,16 @@ Requirements:
 5. Map exit codes: 0->200, non-zero->500 with stderr in error detail
 6. Set PluginInfo with protocol="cli"
 7. Sanitize all input parameters before passing to Command (reject shell metacharacters)
-"#
+
+REFERENCE IMPLEMENTATION (this code compiles successfully - use it as a structural template):
+```rust
+{reference}
+```
+
+Now generate the SPECIFIC plugin for the CLI tool above, adapting the reference implementation.
+Remember: return ONLY code in a ```rust block, NO explanations.
+"#,
+        reference = super::reference_plugins::CLI_REFERENCE
     )
 }
 
@@ -187,7 +240,16 @@ Requirements:
 5. Handle SSH errors: exit 255->502 (connection error), other non-zero->500
 6. Set PluginInfo with protocol="ssh"
 7. Use -o BatchMode=yes and -o ConnectTimeout=10 for non-interactive, timeout-safe execution
-"#
+
+REFERENCE IMPLEMENTATION (this code compiles successfully - use it as a structural template):
+```rust
+{reference}
+```
+
+Now generate the SPECIFIC plugin for the SSH commands above, adapting the reference implementation.
+Remember: return ONLY code in a ```rust block, NO explanations.
+"#,
+        reference = super::reference_plugins::SSH_REFERENCE
     )
 }
 
@@ -208,7 +270,16 @@ Requirements:
 4. Use regex for prompt detection
 5. Handle timeouts gracefully (set a deadline, return 504 on timeout)
 6. Set PluginInfo with protocol="pty"
-"#
+
+REFERENCE IMPLEMENTATION (this code compiles successfully - use it as a structural template):
+```rust
+{reference}
+```
+
+Now generate the SPECIFIC plugin for the PTY session above, adapting the reference implementation.
+Remember: return ONLY code in a ```rust block, NO explanations.
+"#,
+        reference = super::reference_plugins::PTY_REFERENCE
     )
 }
 

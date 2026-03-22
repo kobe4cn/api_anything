@@ -4,5 +4,446 @@
     "version": "1.0.0"
   },
   "openapi": "3.0.3",
-  "paths": {}
+  "paths": {
+    "/gw/pets": {
+      "get": {
+        "operationId": "listPets",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "age": {
+                        "type": "integer"
+                      },
+                      "breed": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "integer"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "owner": {
+                        "$ref": "#/definitions/Owner"
+                      },
+                      "species": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "tags": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "vaccinations": {
+                        "items": {
+                          "$ref": "#/definitions/Vaccination"
+                        },
+                        "type": "array"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "List all pets in the store"
+      },
+      "post": {
+        "operationId": "createPet",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "age": {
+                    "type": "integer"
+                  },
+                  "breed": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "owner": {
+                    "$ref": "#/definitions/Owner"
+                  },
+                  "species": {
+                    "type": "string"
+                  },
+                  "weight": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name",
+                  "species"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "age": {
+                      "type": "integer"
+                    },
+                    "breed": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "species": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "weight": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Create a new pet"
+      }
+    },
+    "/gw/pets/{id}": {
+      "delete": {
+        "operationId": "deletePet",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Delete a pet by ID"
+      },
+      "get": {
+        "operationId": "getPetById",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "age": {
+                      "type": "integer"
+                    },
+                    "breed": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "owner": {
+                      "$ref": "#/definitions/Owner"
+                    },
+                    "species": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "tags": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "vaccinations": {
+                      "items": {
+                        "$ref": "#/definitions/Vaccination"
+                      },
+                      "type": "array"
+                    },
+                    "weight": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Get a pet by ID"
+      },
+      "put": {
+        "operationId": "updatePet",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "weight": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "weight": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Update an existing pet"
+      }
+    },
+    "/gw/pets/{id}/vaccinations": {
+      "get": {
+        "operationId": "getPetVaccinations",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "date": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "integer"
+                      },
+                      "nextDueDate": {
+                        "type": "string"
+                      },
+                      "vaccine": {
+                        "type": "string"
+                      },
+                      "veterinarian": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Get all vaccinations for a pet"
+      },
+      "post": {
+        "operationId": "addVaccination",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "date": {
+                    "type": "string"
+                  },
+                  "vaccine": {
+                    "type": "string"
+                  },
+                  "veterinarian": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "vaccine",
+                  "date"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "date": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "integer"
+                    },
+                    "nextDueDate": {
+                      "type": "string"
+                    },
+                    "vaccine": {
+                      "type": "string"
+                    },
+                    "veterinarian": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Add a vaccination record for a pet"
+      }
+    }
+  }
 }

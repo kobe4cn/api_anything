@@ -5,48 +5,26 @@
   },
   "openapi": "3.0.3",
   "paths": {
-    "/gw/execute_switch_command": {
+    "/gw/environment": {
       "post": {
-        "operationId": "executeSwitchCommand",
+        "operationId": "getEnvironment",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "properties": {
-                  "command": {
+                  "host": {
+                    "description": "Switch hostname or IP",
                     "type": "string"
                   },
-                  "config": {
-                    "properties": {
-                      "host": {
-                        "type": "string"
-                      },
-                      "password": {
-                        "nullable": true,
-                        "type": "string"
-                      },
-                      "port": {
-                        "type": "integer"
-                      },
-                      "private_key": {
-                        "nullable": true,
-                        "type": "string"
-                      },
-                      "username": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "host",
-                      "port",
-                      "username"
-                    ],
-                    "type": "object"
+                  "user": {
+                    "description": "SSH username",
+                    "type": "string"
                   }
                 },
                 "required": [
-                  "config",
-                  "command"
+                  "host",
+                  "user"
                 ],
                 "type": "object"
               }
@@ -60,20 +38,22 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "data": {
-                      "nullable": true
+                    "fans": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
                     },
-                    "message": {
+                    "power_supplies": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "temperature": {
                       "type": "string"
-                    },
-                    "success": {
-                      "type": "boolean"
                     }
                   },
-                  "required": [
-                    "success",
-                    "message"
-                  ],
                   "type": "object"
                 }
               }
@@ -93,7 +73,386 @@
             "description": "Backend timeout"
           }
         },
-        "summary": "Executes a command on a network switch via SSH."
+        "summary": "Retrieve environment status including fans, temperature, and power supplies"
+      }
+    },
+    "/gw/interface/{name}": {
+      "post": {
+        "operationId": "getInterfaceConfig",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "host": {
+                    "description": "Switch hostname or IP",
+                    "type": "string"
+                  },
+                  "user": {
+                    "description": "SSH username",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "host",
+                  "user"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "output": {
+                      "description": "Interface configuration output",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Retrieve running configuration for a specific interface"
+      }
+    },
+    "/gw/interfaces": {
+      "post": {
+        "operationId": "getInterfaces",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "host": {
+                    "description": "Switch hostname or IP",
+                    "type": "string"
+                  },
+                  "user": {
+                    "description": "SSH username",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "host",
+                  "user"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "properties": {
+                          "Duplex": {
+                            "type": "string"
+                          },
+                          "Name": {
+                            "type": "string"
+                          },
+                          "Port": {
+                            "type": "string"
+                          },
+                          "Speed": {
+                            "type": "string"
+                          },
+                          "Status": {
+                            "type": "string"
+                          },
+                          "Type": {
+                            "type": "string"
+                          },
+                          "Vlan": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Retrieve interface status from Cisco switch"
+      }
+    },
+    "/gw/ip-interface": {
+      "post": {
+        "operationId": "getIpInterfaces",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "host": {
+                    "description": "Switch hostname or IP",
+                    "type": "string"
+                  },
+                  "user": {
+                    "description": "SSH username",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "host",
+                  "user"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "properties": {
+                          "IP-Address": {
+                            "type": "string"
+                          },
+                          "Interface": {
+                            "type": "string"
+                          },
+                          "Method": {
+                            "type": "string"
+                          },
+                          "OK?": {
+                            "type": "string"
+                          },
+                          "Protocol": {
+                            "type": "string"
+                          },
+                          "Status": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Retrieve IP interface brief information from Cisco switch"
+      }
+    },
+    "/gw/mac-table/{vlan_id}": {
+      "post": {
+        "operationId": "getMacTable",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "host": {
+                    "description": "Switch hostname or IP",
+                    "type": "string"
+                  },
+                  "user": {
+                    "description": "SSH username",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "host",
+                  "user"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "properties": {
+                          "Mac Address": {
+                            "type": "string"
+                          },
+                          "Ports": {
+                            "type": "string"
+                          },
+                          "Type": {
+                            "type": "string"
+                          },
+                          "Vlan": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Retrieve MAC address table for a specific VLAN"
+      }
+    },
+    "/gw/vlans": {
+      "post": {
+        "operationId": "getVlans",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "host": {
+                    "description": "Switch hostname or IP",
+                    "type": "string"
+                  },
+                  "user": {
+                    "description": "SSH username",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "host",
+                  "user"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "properties": {
+                          "Name": {
+                            "type": "string"
+                          },
+                          "Ports": {
+                            "type": "string"
+                          },
+                          "Status": {
+                            "type": "string"
+                          },
+                          "VLAN": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Retrieve VLAN brief information from Cisco switch"
       }
     }
   }
