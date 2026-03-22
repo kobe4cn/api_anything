@@ -19,7 +19,11 @@ impl OpenAiCompatibleClient {
             api_key,
             model,
             base_url: base_url.unwrap_or_else(|| "https://api.openai.com/v1".to_string()),
-            client: reqwest::Client::new(),
+            // 推理模型（如 glm-5, o1）响应较慢，需要足够的超时时间
+            client: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(300))
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new()),
         }
     }
 }

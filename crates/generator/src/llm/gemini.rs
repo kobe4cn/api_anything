@@ -21,7 +21,10 @@ impl GeminiClient {
             base_url: base_url.unwrap_or_else(|| {
                 "https://generativelanguage.googleapis.com/v1beta".to_string()
             }),
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(300))
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new()),
         }
     }
 }

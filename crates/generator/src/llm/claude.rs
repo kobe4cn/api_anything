@@ -15,7 +15,10 @@ impl ClaudeClient {
             api_key,
             // claude-sonnet-4-20250514 是截至当前发布的能力与成本平衡最优模型
             model: model.unwrap_or_else(|| "claude-sonnet-4-20250514".to_string()),
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(300))
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new()),
         }
     }
 }
