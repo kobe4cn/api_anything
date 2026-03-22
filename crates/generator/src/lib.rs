@@ -7,3 +7,4 @@ pub mod shadow_test;
 pub mod agent_prompt;
 pub mod cli_help;
 pub mod ssh_sample;
+pub mod changelog;
