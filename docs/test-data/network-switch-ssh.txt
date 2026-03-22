@@ -1,0 +1,87 @@
+# SSH Interaction Sample
+# Host: 192.168.1.1
+# User: admin
+# Device: Cisco Catalyst 9300 Series Switch
+# Description: 数据中心核心交换机运维命令集
+
+## Command: show interfaces status
+## Description: 列出所有物理端口的连接状态、速度和双工模式
+## Output Format: table
+## Sample Output:
+Port         Name               Status       Vlan    Duplex  Speed   Type
+Gi1/0/1      uplink-to-core     connected    trunk   a-full  a-1000  1000BaseTX
+Gi1/0/2      db-server-01       connected    100     a-full  a-1000  1000BaseTX
+Gi1/0/3      db-server-02       connected    100     a-full  a-1000  1000BaseTX
+Gi1/0/4      app-server-01      connected    200     a-full  a-1000  1000BaseTX
+Gi1/0/5      app-server-02      connected    200     a-full  a-1000  1000BaseTX
+Gi1/0/6      monitoring         connected    300     a-full  a-100   100BaseTX
+Gi1/0/7      --                 notconnect   1       auto    auto    1000BaseTX
+Gi1/0/8      --                 disabled     1       auto    auto    1000BaseTX
+Te1/1/1      isp-uplink         connected    trunk   full    10G     10GBaseSR
+
+## Command: show vlan brief
+## Description: 显示 VLAN 配置摘要，包含名称和活动端口
+## Output Format: table
+## Sample Output:
+VLAN  Name                  Status    Ports
+----  --------------------  --------  ----------------------------------
+1     default               active    Gi1/0/7, Gi1/0/8
+100   database-zone         active    Gi1/0/2, Gi1/0/3
+200   application-zone      active    Gi1/0/4, Gi1/0/5
+300   monitoring-zone       active    Gi1/0/6
+999   quarantine            active
+
+## Command: show running-config interface {interface}
+## Description: 显示指定接口的运行时配置
+## Output Format: text
+## Sample Output:
+interface GigabitEthernet1/0/2
+ description db-server-01
+ switchport access vlan 100
+ switchport mode access
+ spanning-tree portfast
+ speed 1000
+ duplex full
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ no shutdown
+
+## Command: show mac address-table vlan {vlan_id}
+## Description: 显示指定 VLAN 的 MAC 地址表
+## Output Format: table
+## Sample Output:
+          Mac Address Table
+-------------------------------------------
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+ 100    aabb.cc00.0101    DYNAMIC     Gi1/0/2
+ 100    aabb.cc00.0102    DYNAMIC     Gi1/0/3
+Total Mac Addresses for this criterion: 2
+
+## Command: show ip interface brief
+## Description: 列出所有三层接口的 IP 地址和状态
+## Output Format: table
+## Sample Output:
+Interface              IP-Address      OK? Method  Status                Protocol
+Vlan1                  unassigned      YES unset   up                    up
+Vlan100                10.10.100.1     YES manual  up                    up
+Vlan200                10.10.200.1     YES manual  up                    up
+Vlan300                10.10.300.1     YES manual  up                    up
+GigabitEthernet0/0     192.168.1.1     YES manual  up                    up
+
+## Command: show environment
+## Description: 显示设备环境信息（温度、电源、风扇）
+## Output Format: text
+## Sample Output:
+Switch 1 FAN 1 is OK
+Switch 1 FAN 2 is OK
+Switch 1 FAN 3 is OK
+SYSTEM TEMPERATURE is OK
+System Temperature Value: 38 Degree Celsius
+System Temperature State: GREEN
+Yellow Threshold : 56 Degree Celsius
+Red Threshold    : 68 Degree Celsius
+SW  PID                 Serial#     Status           Sys Pwr  PoE Pwr  Watts
+--  ------------------  ----------  ---------------  -------  -------  -----
+1A  PWR-C1-1100WAC      LIT2345X01  OK               Good     Good     1100
+1B  Not Present

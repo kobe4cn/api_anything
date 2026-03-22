@@ -1,0 +1,87 @@
+# SSH Interaction Sample
+# Host: 10.0.2.100
+# User: ops
+# Device: Ubuntu 22.04 LTS Application Server
+# Description: Linux 应用服务器运维命令集
+
+## Command: systemctl status {service_name}
+## Description: 查看指定系统服务的运行状态
+## Output Format: text
+## Sample Output:
+● nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/lib/systemd/system/nginx.service; enabled; vendor preset: enabled)
+     Active: active (running) since Mon 2024-03-18 08:15:32 UTC; 4 days ago
+       Docs: man:nginx(8)
+    Process: 1234 ExecStartPre=/usr/sbin/nginx -t -q -g daemon on; master_process on; (code=exited, status=0/SUCCESS)
+    Process: 1256 ExecStart=/usr/sbin/nginx -g daemon on; master_process on; (code=exited, status=0/SUCCESS)
+   Main PID: 1257 (nginx)
+      Tasks: 5 (limit: 9451)
+     Memory: 12.8M
+        CPU: 1min 23.456s
+     CGroup: /system.slice/nginx.service
+             ├─1257 "nginx: master process /usr/sbin/nginx -g daemon on; master_process on;"
+             └─1258 "nginx: worker process" "" "" "" "" "" "" "" "" "" "" "" "" "" "" ""
+
+## Command: df -h
+## Description: 查看磁盘使用情况
+## Output Format: table
+## Sample Output:
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1       100G   45G   51G  47% /
+/dev/sdb1       500G  320G  155G  68% /data
+tmpfs           7.8G  1.2M  7.8G   1% /dev/shm
+/dev/sdc1       200G   12G  178G   7% /backup
+
+## Command: free -h
+## Description: 查看内存使用情况
+## Output Format: table
+## Sample Output:
+               total        used        free      shared  buff/cache   available
+Mem:            15Gi       8.2Gi       1.3Gi       256Mi       6.1Gi       6.5Gi
+Swap:          4.0Gi       512Mi       3.5Gi
+
+## Command: docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+## Description: 列出运行中的 Docker 容器
+## Output Format: table
+## Sample Output:
+NAMES               STATUS          PORTS
+api-gateway         Up 4 days       0.0.0.0:8080->8080/tcp
+postgres-main       Up 4 days       0.0.0.0:5432->5432/tcp
+redis-cache         Up 4 days       0.0.0.0:6379->6379/tcp
+prometheus          Up 4 days       0.0.0.0:9090->9090/tcp
+grafana             Up 4 days       0.0.0.0:3000->3000/tcp
+
+## Command: journalctl -u {service_name} --since "{since_time}" --no-pager -n {lines}
+## Description: 查看指定服务的最近日志
+## Output Format: text
+## Sample Output:
+Mar 22 10:15:01 app-server-01 nginx[1257]: 10.0.1.50 - - [22/Mar/2024:10:15:01 +0000] "GET /health HTTP/1.1" 200 15 "-" "kube-probe/1.28"
+Mar 22 10:15:05 app-server-01 nginx[1257]: 10.0.1.100 - - [22/Mar/2024:10:15:05 +0000] "POST /api/v1/orders HTTP/1.1" 201 342 "-" "curl/8.4.0"
+Mar 22 10:15:06 app-server-01 nginx[1257]: 10.0.1.100 - - [22/Mar/2024:10:15:06 +0000] "GET /api/v1/orders/123 HTTP/1.1" 200 1024 "-" "curl/8.4.0"
+
+## Command: ss -tlnp
+## Description: 查看 TCP 监听端口
+## Output Format: table
+## Sample Output:
+State    Recv-Q   Send-Q   Local Address:Port   Peer Address:Port   Process
+LISTEN   0        511      0.0.0.0:8080         0.0.0.0:*           users:(("nginx",pid=1257,fd=6))
+LISTEN   0        244      0.0.0.0:5432         0.0.0.0:*           users:(("postgres",pid=2001,fd=3))
+LISTEN   0        511      0.0.0.0:6379         0.0.0.0:*           users:(("redis-server",pid=2100,fd=6))
+LISTEN   0        4096     0.0.0.0:9090         0.0.0.0:*           users:(("prometheus",pid=2200,fd=7))
+LISTEN   0        4096     0.0.0.0:3000         0.0.0.0:*           users:(("grafana",pid=2300,fd=11))
+
+## Command: top -bn1 | head -20
+## Description: 查看系统资源使用概况和 CPU 占用最高的进程
+## Output Format: text
+## Sample Output:
+top - 10:15:30 up 4 days,  2:00,  1 user,  load average: 0.85, 0.72, 0.68
+Tasks: 142 total,   1 running, 141 sleeping,   0 stopped,   0 zombie
+%Cpu(s): 12.5 us,  3.2 sy,  0.0 ni, 83.1 id,  0.5 wa,  0.0 hi,  0.7 si,  0.0 st
+MiB Mem :  16048.0 total,   1356.0 free,   8396.0 used,   6296.0 buff/cache
+MiB Swap:   4096.0 total,   3584.0 free,    512.0 used.   6668.0 avail Mem
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   2001 postgres  20   0 1256780 524288  32768 S   8.5   3.2  52:34.12 postgres
+   1257 www-data  20   0  128456  13108   7680 S   2.1   0.1  12:45.67 nginx
+   2100 redis     20   0  102400  45056   4096 S   1.5   0.3   8:23.45 redis-server
+   2200 nobody    20   0  845312 156672  32768 S   1.2   1.0   6:12.34 prometheus

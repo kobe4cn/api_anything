@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions name="OrderService"
+  targetNamespace="http://example.com/order"
+  xmlns="http://schemas.xmlsoap.org/wsdl/"
+  xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+  xmlns:tns="http://example.com/order"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+
+  <types>
+    <xsd:schema targetNamespace="http://example.com/order">
+
+      <!-- 通用分页类型，供多个操作复用 -->
+      <xsd:complexType name="PaginationRequest">
+        <xsd:sequence>
+          <xsd:element name="page" type="xsd:int" minOccurs="0" default="1"/>
+          <xsd:element name="page_size" type="xsd:int" minOccurs="0" default="20"/>
+        </xsd:sequence>
+      </xsd:complexType>
+
+      <xsd:complexType name="PaginationResponse">
+        <xsd:sequence>
+          <xsd:element name="total" type="xsd:int"/>
+          <xsd:element name="page" type="xsd:int"/>
+          <xsd:element name="page_size" type="xsd:int"/>
+        </xsd:sequence>
+      </xsd:complexType>
+
+      <!-- 地址类型：嵌套结构测试 -->
+      <xsd:complexType name="Address">
+        <xsd:sequence>
+          <xsd:element name="street" type="xsd:string"/>
+          <xsd:element name="city" type="xsd:string"/>
+          <xsd:element name="state" type="xsd:string"/>
+          <xsd:element name="zip_code" type="xsd:string"/>
+          <xsd:element name="country" type="xsd:string"/>
+        </xsd:sequence>
+      </xsd:complexType>
+
+      <!-- 订单行项类型：数组元素 -->
+      <xsd:complexType name="OrderItem">
+        <xsd:sequence>
+          <xsd:element name="product_id" type="xsd:string"/>
+          <xsd:element name="product_name" type="xsd:string"/>
+          <xsd:element name="quantity" type="xsd:int"/>
+          <xsd:element name="unit_price" type="xsd:decimal"/>
+          <xsd:element name="discount_percent" type="xsd:decimal" minOccurs="0"/>
+        </xsd:sequence>
+      </xsd:complexType>
+
+      <!-- 订单摘要类型：包含嵌套对象和数组 -->
+      <xsd:complexType name="OrderSummary">
+        <xsd:sequence>
+          <xsd:element name="order_id" type="xsd:string"/>
+          <xsd:element name="customer_name" type="xsd:string"/>
+          <xsd:element name="status" type="xsd:string"/>
+          <xsd:element name="total_amount" type="xsd:decimal"/>
+          <xsd:element name="currency" type="xsd:string"/>
+          <xsd:element name="created_at" type="xsd:dateTime"/>
+        </xsd:sequence>
+      </xsd:complexType>
+
+      <!-- 历史记录条目 -->
+      <xsd:complexType name="OrderHistoryEntry">
+        <xsd:sequence>
+          <xsd:element name="timestamp" type="xsd:dateTime"/>
+          <xsd:element name="action" type="xsd:string"/>
+          <xsd:element name="operator" type="xsd:string"/>
+          <xsd:element name="detail" type="xsd:string" minOccurs="0"/>
+        </xsd:sequence>
+      </xsd:complexType>
+
+      <!-- ========== GetOrder: 按 ID 查询单个订单 ========== -->
+      <xsd:element name="GetOrderRequest">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="order_id" type="xsd:string"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <xsd:element name="GetOrderResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="order_id" type="xsd:string"/>
+            <xsd:element name="customer_id" type="xsd:string"/>
+            <xsd:element name="customer_name" type="xsd:string"/>
+            <xsd:element name="customer_email" type="xsd:string"/>
+            <xsd:element name="status" type="xsd:string"/>
+            <xsd:element name="shipping_address" type="tns:Address"/>
+            <xsd:element name="billing_address" type="tns:Address"/>
+            <xsd:element name="items" type="tns:OrderItem" maxOccurs="unbounded"/>
+            <xsd:element name="subtotal" type="xsd:decimal"/>
+            <xsd:element name="tax" type="xsd:decimal"/>
+            <xsd:element name="shipping_fee" type="xsd:decimal"/>
+            <xsd:element name="total_amount" type="xsd:decimal"/>
+            <xsd:element name="currency" type="xsd:string"/>
+            <xsd:element name="created_at" type="xsd:dateTime"/>
+            <xsd:element name="updated_at" type="xsd:dateTime"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <!-- ========== CreateOrder: 复杂嵌套输入 ========== -->
+      <xsd:element name="CreateOrderRequest">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="customer_id" type="xsd:string"/>
+            <xsd:element name="shipping_address" type="tns:Address"/>
+            <xsd:element name="billing_address" type="tns:Address" minOccurs="0"/>
+            <xsd:element name="items" type="tns:OrderItem" maxOccurs="unbounded"/>
+            <xsd:element name="coupon_code" type="xsd:string" minOccurs="0"/>
+            <xsd:element name="notes" type="xsd:string" minOccurs="0"/>
+            <xsd:element name="payment_method" type="xsd:string"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <xsd:element name="CreateOrderResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="order_id" type="xsd:string"/>
+            <xsd:element name="status" type="xsd:string"/>
+            <xsd:element name="total_amount" type="xsd:decimal"/>
+            <xsd:element name="estimated_delivery" type="xsd:dateTime"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <!-- ========== ListOrders: 分页查询 ========== -->
+      <xsd:element name="ListOrdersRequest">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="customer_id" type="xsd:string" minOccurs="0"/>
+            <xsd:element name="status_filter" type="xsd:string" minOccurs="0"/>
+            <xsd:element name="date_from" type="xsd:dateTime" minOccurs="0"/>
+            <xsd:element name="date_to" type="xsd:dateTime" minOccurs="0"/>
+            <xsd:element name="pagination" type="tns:PaginationRequest"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <xsd:element name="ListOrdersResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="orders" type="tns:OrderSummary" maxOccurs="unbounded"/>
+            <xsd:element name="pagination" type="tns:PaginationResponse"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <!-- ========== CancelOrder: 状态变更 ========== -->
+      <xsd:element name="CancelOrderRequest">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="order_id" type="xsd:string"/>
+            <xsd:element name="reason" type="xsd:string"/>
+            <xsd:element name="refund_requested" type="xsd:boolean"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <xsd:element name="CancelOrderResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="order_id" type="xsd:string"/>
+            <xsd:element name="previous_status" type="xsd:string"/>
+            <xsd:element name="new_status" type="xsd:string"/>
+            <xsd:element name="refund_status" type="xsd:string"/>
+            <xsd:element name="cancelled_at" type="xsd:dateTime"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <!-- ========== GetOrderHistory: 数组返回 ========== -->
+      <xsd:element name="GetOrderHistoryRequest">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="order_id" type="xsd:string"/>
+            <xsd:element name="pagination" type="tns:PaginationRequest" minOccurs="0"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <xsd:element name="GetOrderHistoryResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="order_id" type="xsd:string"/>
+            <xsd:element name="entries" type="tns:OrderHistoryEntry" maxOccurs="unbounded"/>
+            <xsd:element name="pagination" type="tns:PaginationResponse"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+    </xsd:schema>
+  </types>
+
+  <!-- 消息定义 -->
+  <message name="GetOrderInput"><part name="parameters" element="tns:GetOrderRequest"/></message>
+  <message name="GetOrderOutput"><part name="parameters" element="tns:GetOrderResponse"/></message>
+  <message name="CreateOrderInput"><part name="parameters" element="tns:CreateOrderRequest"/></message>
+  <message name="CreateOrderOutput"><part name="parameters" element="tns:CreateOrderResponse"/></message>
+  <message name="ListOrdersInput"><part name="parameters" element="tns:ListOrdersRequest"/></message>
+  <message name="ListOrdersOutput"><part name="parameters" element="tns:ListOrdersResponse"/></message>
+  <message name="CancelOrderInput"><part name="parameters" element="tns:CancelOrderRequest"/></message>
+  <message name="CancelOrderOutput"><part name="parameters" element="tns:CancelOrderResponse"/></message>
+  <message name="GetOrderHistoryInput"><part name="parameters" element="tns:GetOrderHistoryRequest"/></message>
+  <message name="GetOrderHistoryOutput"><part name="parameters" element="tns:GetOrderHistoryResponse"/></message>
+
+  <!-- SOAP Fault 消息 -->
+  <message name="OrderFault">
+    <part name="fault" element="tns:GetOrderRequest"/>
+  </message>
+
+  <portType name="OrderPortType">
+    <operation name="GetOrder">
+      <input message="tns:GetOrderInput"/>
+      <output message="tns:GetOrderOutput"/>
+    </operation>
+    <operation name="CreateOrder">
+      <input message="tns:CreateOrderInput"/>
+      <output message="tns:CreateOrderOutput"/>
+    </operation>
+    <operation name="ListOrders">
+      <input message="tns:ListOrdersInput"/>
+      <output message="tns:ListOrdersOutput"/>
+    </operation>
+    <operation name="CancelOrder">
+      <input message="tns:CancelOrderInput"/>
+      <output message="tns:CancelOrderOutput"/>
+    </operation>
+    <operation name="GetOrderHistory">
+      <input message="tns:GetOrderHistoryInput"/>
+      <output message="tns:GetOrderHistoryOutput"/>
+    </operation>
+  </portType>
+
+  <binding name="OrderBinding" type="tns:OrderPortType">
+    <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <operation name="GetOrder">
+      <soap:operation soapAction="http://example.com/order/GetOrder"/>
+    </operation>
+    <operation name="CreateOrder">
+      <soap:operation soapAction="http://example.com/order/CreateOrder"/>
+    </operation>
+    <operation name="ListOrders">
+      <soap:operation soapAction="http://example.com/order/ListOrders"/>
+    </operation>
+    <operation name="CancelOrder">
+      <soap:operation soapAction="http://example.com/order/CancelOrder"/>
+    </operation>
+    <operation name="GetOrderHistory">
+      <soap:operation soapAction="http://example.com/order/GetOrderHistory"/>
+    </operation>
+  </binding>
+
+  <service name="OrderService">
+    <port name="OrderPort" binding="tns:OrderBinding">
+      <soap:address location="http://legacy-erp.internal:8080/soap/orders"/>
+    </port>
+  </service>
+</definitions>

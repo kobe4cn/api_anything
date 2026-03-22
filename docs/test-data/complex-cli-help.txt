@@ -1,0 +1,32 @@
+dbctl 3.5.2
+Database management toolkit for PostgreSQL and MySQL
+
+USAGE:
+    dbctl [OPTIONS] <SUBCOMMAND>
+
+SUBCOMMANDS:
+    connect       Connect to a database instance
+    query         Execute SQL query and return results
+    backup        Create database backup
+    restore       Restore database from backup
+    migrate       Run database migrations
+    status        Show database status and statistics
+    users         Manage database users and permissions
+    tables        List and inspect table schemas
+    export        Export data to CSV/JSON/Parquet
+    import        Import data from file
+
+OPTIONS:
+    -h, --host <HOST>            Database host [default: localhost]
+    -p, --port <PORT>            Database port [default: 5432]
+    -U, --user <USER>            Database user [default: postgres]
+    -d, --database <DBNAME>      Database name
+    -W, --password <PASSWORD>    Database password (or use DBCTL_PASSWORD env)
+        --ssl                    Enable SSL connection
+        --timeout <SECONDS>      Connection timeout [default: 30]
+    -v, --verbose                Increase output verbosity
+    -q, --quiet                  Suppress non-error output
+        --format <FORMAT>        Output format [default: table] [possible values: table, json, csv, yaml]
+        --color <WHEN>           Color output [default: auto] [possible values: auto, always, never]
+    -h, --help                   Print help information
+    -V, --version                Print version

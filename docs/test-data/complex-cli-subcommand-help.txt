@@ -1,0 +1,27 @@
+dbctl query
+Execute SQL query and return results
+
+USAGE:
+    dbctl query [OPTIONS] <SQL>
+
+ARGS:
+    <SQL>    SQL query to execute. Use '-' to read from stdin
+
+OPTIONS:
+    -f, --file <PATH>           Read SQL from file instead of argument
+        --params <KEY=VALUE>    Query parameters (can be repeated)
+        --limit <N>             Limit result rows [default: 1000]
+        --offset <N>            Offset for result pagination [default: 0]
+        --explain               Show query execution plan
+        --analyze               Run EXPLAIN ANALYZE (executes the query)
+        --no-header             Omit column headers in output
+        --format <FORMAT>       Override output format [possible values: table, json, csv]
+        --timeout <SECONDS>     Query execution timeout [default: 60]
+        --read-only             Execute in read-only transaction
+    -h, --help                  Print help information
+
+EXAMPLES:
+    dbctl query "SELECT * FROM users WHERE active = true"
+    dbctl query -f report.sql --format json
+    dbctl query "SELECT * FROM orders WHERE id = :id" --params id=12345
+    echo "SELECT 1" | dbctl query -
