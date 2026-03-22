@@ -126,6 +126,24 @@ async fn setup_with_delivery_guarantee(
 }
 
 async fn cleanup(pool: &sqlx::PgPool, project_id: Uuid) {
+    // delivery_records 和 idempotency_keys 通过 FK 引用 routes，
+    // 但未设置 ON DELETE CASCADE，必须先清理这些表再删除 project（级联删除 contracts -> routes）
+    sqlx::query(
+        "DELETE FROM idempotency_keys WHERE route_id IN (SELECT r.id FROM routes r JOIN contracts c ON r.contract_id = c.id WHERE c.project_id = $1)"
+    )
+    .bind(project_id)
+    .execute(pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        "DELETE FROM delivery_records WHERE route_id IN (SELECT r.id FROM routes r JOIN contracts c ON r.contract_id = c.id WHERE c.project_id = $1)"
+    )
+    .bind(project_id)
+    .execute(pool)
+    .await
+    .unwrap();
+
     sqlx::query("DELETE FROM projects WHERE id = $1")
         .bind(project_id)
         .execute(pool)
@@ -403,12 +421,51 @@ async fn compensation_dead_letter_resolve_nonexistent() {
     resp.assert_status(StatusCode::NOT_FOUND);
 }
 
+/// 创建最小化的 project -> contract -> backend_binding -> route 行，
+/// 仅为满足 delivery_records 的 FK 约束，不涉及网关逻辑
+async fn create_dummy_route(pool: &sqlx::PgPool) -> (Uuid, Uuid) {
+    let suffix = Uuid::new_v4();
+    let project_id: (Uuid,) = sqlx::query_as(
+        "INSERT INTO projects (name, description, owner, source_type) VALUES ($1, 'dummy', 'test', 'wsdl') RETURNING id",
+    )
+    .bind(format!("dl-test-{suffix}"))
+    .fetch_one(pool)
+    .await
+    .unwrap();
+
+    let contract_id: (Uuid,) = sqlx::query_as(
+        "INSERT INTO contracts (project_id, version, original_schema, parsed_model) VALUES ($1, '1.0', '', '{}') RETURNING id",
+    )
+    .bind(project_id.0)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+
+    let binding_id: (Uuid,) = sqlx::query_as(
+        "INSERT INTO backend_bindings (protocol, endpoint_config) VALUES ('soap'::protocol_type, '{}') RETURNING id",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap();
+
+    let route_id: (Uuid,) = sqlx::query_as(
+        "INSERT INTO routes (contract_id, method, path, backend_binding_id) VALUES ($1, 'POST'::http_method, '/dummy', $2) RETURNING id",
+    )
+    .bind(contract_id.0)
+    .bind(binding_id.0)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+
+    (route_id.0, project_id.0)
+}
+
 #[tokio::test]
 async fn compensation_dead_letter_full_lifecycle() {
     let pool = common::test_pool().await;
     let server = common::test_server().await;
 
-    let route_id = Uuid::new_v4();
+    let (route_id, dummy_project_id) = create_dummy_route(&pool).await;
 
     // 1. 手动创建一条 status=dead 的 delivery_record
     let record_id1: (Uuid,) = sqlx::query_as(
@@ -499,9 +556,14 @@ async fn compensation_dead_letter_full_lifecycle() {
     let detail: serde_json::Value = detail_resp.json();
     assert_eq!(detail["id"].as_str(), Some(&*record_id2.0.to_string()));
 
-    // 清理
+    // 清理：先删除引用 route 的 delivery_records，再删除 project（级联删除 route）
     sqlx::query("DELETE FROM delivery_records WHERE route_id = $1")
         .bind(route_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM projects WHERE id = $1")
+        .bind(dummy_project_id)
         .execute(&pool)
         .await
         .unwrap();
@@ -512,7 +574,7 @@ async fn compensation_batch_retry() {
     let pool = common::test_pool().await;
     let server = common::test_server().await;
 
-    let route_id = Uuid::new_v4();
+    let (route_id, dummy_project_id) = create_dummy_route(&pool).await;
     let mut ids = Vec::new();
 
     // 创建 3 条 dead 记录
@@ -559,9 +621,14 @@ async fn compensation_batch_retry() {
         );
     }
 
-    // 清理
+    // 清理：先删除引用 route 的 delivery_records，再删除 project（级联删除 route）
     sqlx::query("DELETE FROM delivery_records WHERE route_id = $1")
         .bind(route_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM projects WHERE id = $1")
+        .bind(dummy_project_id)
         .execute(&pool)
         .await
         .unwrap();

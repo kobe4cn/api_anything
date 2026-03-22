@@ -37,8 +37,10 @@ impl DeadLetterProcessor {
     }
 
     /// 将记录标记为已人工处理（delivered + error_message = "Manually resolved"），
-    /// 适用于上游系统已通过其他渠道完成投递、无需再重试的场景
+    /// 适用于上游系统已通过其他渠道完成投递、无需再重试的场景。
+    /// 先验证记录存在，不存在时返回 404 而非静默 UPDATE 0 行
     pub async fn mark_resolved(repo: &impl MetadataRepo, record_id: Uuid) -> Result<(), AppError> {
+        let _record = repo.get_delivery_record(record_id).await?;
         repo.update_delivery_status(
             record_id,
             DeliveryStatus::Delivered,
