@@ -175,7 +175,7 @@ pub struct Artifact {
 }
 
 // idempotency_key 允许客户端幂等重试；next_retry_at 由调度器决定指数退避时间
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DeliveryRecord {
     pub id: Uuid,
     pub route_id: Uuid,
@@ -189,6 +189,17 @@ pub struct DeliveryRecord {
     pub error_message: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+// idempotency_keys 表中的一行，记录幂等键的处理状态及响应摘要，
+// 供 ExactlyOnce 保证的重复检测使用
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct IdempotencyRecord {
+    pub idempotency_key: String,
+    pub route_id: Uuid,
+    pub status: String,
+    pub response_hash: Option<String>,
+    pub created_at: DateTime<Utc>,
 }
 
 // expires_at 用于自动清理过期沙箱会话，防止测试资源无限占用

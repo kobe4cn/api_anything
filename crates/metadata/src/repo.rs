@@ -13,6 +13,9 @@ pub trait MetadataRepo: Send + Sync {
     /// 加载所有已启用路由及其后端绑定，供网关启动时填充动态路由表
     async fn list_active_routes_with_bindings(&self) -> Result<Vec<RouteWithBinding>, AppError>;
 
+    /// 按 id 查询单条路由，沙箱 mock 模式需要读取 response_schema 生成模拟数据
+    async fn get_route(&self, id: Uuid) -> Result<Route, AppError>;
+
     /// 从解析后的合约创建持久化记录；parsed_model 保存中间表示，避免后续重复解析原始 schema
     async fn create_contract(
         &self,
@@ -83,4 +86,57 @@ pub trait MetadataRepo: Send + Sync {
         &self,
         session_id: Uuid,
     ) -> Result<Vec<RecordedInteraction>, AppError>;
+
+    // ── 投递记录（补偿系统基础） ──────────────────────────────────────────
+
+    /// 创建投递记录，在请求实际分发前写入，确保即使后端失败也有可重试凭据
+    async fn create_delivery_record(
+        &self,
+        route_id: Uuid,
+        trace_id: &str,
+        idempotency_key: Option<&str>,
+        request_payload: &Value,
+    ) -> Result<DeliveryRecord, AppError>;
+
+    /// 更新投递状态；error_message 和 next_retry_at 在 failed 时由调用方计算，
+    /// dead 状态时两者可为 None（不再重试）
+    async fn update_delivery_status(
+        &self,
+        id: Uuid,
+        status: DeliveryStatus,
+        error_message: Option<&str>,
+        next_retry_at: Option<DateTime<Utc>>,
+    ) -> Result<(), AppError>;
+
+    /// 查询 next_retry_at <= now() 的 failed 记录，供重试 worker 轮询使用；
+    /// limit 防止单次捞取过多导致内存压力
+    async fn list_pending_retries(&self, limit: i64) -> Result<Vec<DeliveryRecord>, AppError>;
+
+    /// 查询 dead 状态记录，route_id 为 None 时返回全局死信；
+    /// offset 分页确保管理 API 不会一次性返回大量记录
+    async fn list_dead_letters(
+        &self,
+        route_id: Option<Uuid>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<DeliveryRecord>, AppError>;
+
+    /// 按 id 查询单条投递记录，重试 worker 需要原始请求体重新发起投递
+    async fn get_delivery_record(&self, id: Uuid) -> Result<DeliveryRecord, AppError>;
+
+    // ── 幂等键（ExactlyOnce 保证） ────────────────────────────────────────
+
+    /// 查询幂等键是否已存在；返回 None 表示首次请求，Some 表示重复请求
+    async fn check_idempotency(&self, key: &str) -> Result<Option<IdempotencyRecord>, AppError>;
+
+    /// 在处理开始前写入幂等键（status = 'pending'），防止并发重复请求同时穿透
+    async fn create_idempotency_record(&self, key: &str, route_id: Uuid) -> Result<(), AppError>;
+
+    /// 投递成功后将幂等键置为 delivered 并记录响应摘要，
+    /// 后续重复请求可直接返回 200 而无需重新处理
+    async fn mark_idempotency_delivered(
+        &self,
+        key: &str,
+        response_hash: &str,
+    ) -> Result<(), AppError>;
 }

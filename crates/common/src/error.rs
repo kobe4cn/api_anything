@@ -82,6 +82,10 @@ pub enum AppError {
     // 保留原始 status 供日志和告警使用，detail 对外暴露但不泄露内部实现
     #[error("Backend error: status={status}, detail={detail}")]
     BackendError { status: u16, detail: String },
+    // ExactlyOnce 语义下重复 key 的请求已投递成功，直接返回 200 而非重新处理，
+    // 单独作为变体而非 BadRequest 是为了在 IntoResponse 中区分并返回正确状态码
+    #[error("Already delivered")]
+    AlreadyDelivered,
 }
 
 impl IntoResponse for AppError {
@@ -139,6 +143,11 @@ impl IntoResponse for AppError {
                     detail: Some(format!("status={}, detail={}", status, detail)),
                     instance: None,
                 }.into_response()
+            }
+            // 已投递成功的幂等请求返回 200，告知调用方无需重试，
+            // 同时避免触发客户端的错误处理逻辑
+            AppError::AlreadyDelivered => {
+                (StatusCode::OK, "Already delivered").into_response()
             }
         }
     }

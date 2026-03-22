@@ -315,6 +315,9 @@ mod tests {
         async fn delete_project(&self, _id: Uuid) -> Result<(), AppError> {
             unimplemented!()
         }
+        async fn get_route(&self, _id: Uuid) -> Result<Route, AppError> {
+            unimplemented!()
+        }
         async fn list_active_routes_with_bindings(
             &self,
         ) -> Result<Vec<RouteWithBinding>, AppError> {
@@ -392,6 +395,66 @@ mod tests {
             &self,
             _session_id: Uuid,
         ) -> Result<Vec<RecordedInteraction>, AppError> {
+            unimplemented!()
+        }
+
+        // MockRepo 仅用于网关路由加载测试，补偿系统方法不在测试范围内
+        async fn create_delivery_record(
+            &self,
+            _route_id: Uuid,
+            _trace_id: &str,
+            _idempotency_key: Option<&str>,
+            _request_payload: &serde_json::Value,
+        ) -> Result<api_anything_common::models::DeliveryRecord, AppError> {
+            unimplemented!()
+        }
+        async fn update_delivery_status(
+            &self,
+            _id: Uuid,
+            _status: api_anything_common::models::DeliveryStatus,
+            _error_message: Option<&str>,
+            _next_retry_at: Option<chrono::DateTime<chrono::Utc>>,
+        ) -> Result<(), AppError> {
+            unimplemented!()
+        }
+        async fn list_pending_retries(
+            &self,
+            _limit: i64,
+        ) -> Result<Vec<api_anything_common::models::DeliveryRecord>, AppError> {
+            unimplemented!()
+        }
+        async fn list_dead_letters(
+            &self,
+            _route_id: Option<Uuid>,
+            _limit: i64,
+            _offset: i64,
+        ) -> Result<Vec<api_anything_common::models::DeliveryRecord>, AppError> {
+            unimplemented!()
+        }
+        async fn get_delivery_record(
+            &self,
+            _id: Uuid,
+        ) -> Result<api_anything_common::models::DeliveryRecord, AppError> {
+            unimplemented!()
+        }
+        async fn check_idempotency(
+            &self,
+            _key: &str,
+        ) -> Result<Option<api_anything_common::models::IdempotencyRecord>, AppError> {
+            unimplemented!()
+        }
+        async fn create_idempotency_record(
+            &self,
+            _key: &str,
+            _route_id: Uuid,
+        ) -> Result<(), AppError> {
+            unimplemented!()
+        }
+        async fn mark_idempotency_delivered(
+            &self,
+            _key: &str,
+            _response_hash: &str,
+        ) -> Result<(), AppError> {
             unimplemented!()
         }
     }

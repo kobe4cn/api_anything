@@ -8,6 +8,7 @@ members = [
     "crates/gateway",
     "crates/generator",
     "crates/sandbox",
+    "crates/compensation",
 ]
 
 [workspace.package]

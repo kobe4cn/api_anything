@@ -359,6 +359,217 @@ impl MetadataRepo for PgMetadataRepo {
         Ok(interactions)
     }
 
+    async fn create_delivery_record(
+        &self,
+        route_id: Uuid,
+        trace_id: &str,
+        idempotency_key: Option<&str>,
+        request_payload: &Value,
+    ) -> Result<DeliveryRecord, AppError> {
+        // RETURNING * 避免二次查询；status/retry_count 使用数据库默认值，
+        // 业务层不需要知道这些字段的初始值
+        let record = sqlx::query_as::<_, DeliveryRecord>(
+            r#"
+            INSERT INTO delivery_records (route_id, trace_id, idempotency_key, request_payload)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id, route_id, trace_id, idempotency_key, request_payload,
+                      response_payload, status, retry_count, next_retry_at,
+                      error_message, created_at, updated_at
+            "#,
+        )
+        .bind(route_id)
+        .bind(trace_id)
+        .bind(idempotency_key)
+        .bind(request_payload)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(record)
+    }
+
+    async fn update_delivery_status(
+        &self,
+        id: Uuid,
+        status: DeliveryStatus,
+        error_message: Option<&str>,
+        next_retry_at: Option<DateTime<Utc>>,
+    ) -> Result<(), AppError> {
+        // delivery_status 是 PG 自定义枚举，需通过字符串 + SQL 侧类型转换绑定，
+        // 与 protocol_type / sandbox_mode 的处理方式一致
+        let status_str = match status {
+            DeliveryStatus::Pending => "pending",
+            DeliveryStatus::Delivered => "delivered",
+            DeliveryStatus::Failed => "failed",
+            DeliveryStatus::Dead => "dead",
+        };
+        // failed 状态时递增 retry_count，其他状态（delivered/dead）不增计数，
+        // 避免将最终状态的写入误计为重试次数
+        sqlx::query(
+            r#"
+            UPDATE delivery_records
+            SET status = $2::delivery_status,
+                error_message = $3,
+                next_retry_at = $4,
+                retry_count = CASE WHEN $2 = 'failed' THEN retry_count + 1 ELSE retry_count END
+            WHERE id = $1
+            "#,
+        )
+        .bind(id)
+        .bind(status_str)
+        .bind(error_message)
+        .bind(next_retry_at)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    async fn list_pending_retries(&self, limit: i64) -> Result<Vec<DeliveryRecord>, AppError> {
+        // next_retry_at <= NOW() 确保只捞取到期的记录，指数退避由调用方写入
+        let records = sqlx::query_as::<_, DeliveryRecord>(
+            r#"
+            SELECT id, route_id, trace_id, idempotency_key, request_payload,
+                   response_payload, status, retry_count, next_retry_at,
+                   error_message, created_at, updated_at
+            FROM delivery_records
+            WHERE status = 'failed' AND next_retry_at <= NOW()
+            ORDER BY next_retry_at
+            LIMIT $1
+            "#,
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(records)
+    }
+
+    async fn list_dead_letters(
+        &self,
+        route_id: Option<Uuid>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<DeliveryRecord>, AppError> {
+        // route_id 为 None 时返回所有死信（全局视图），提供 route_id 时过滤至单条路由；
+        // 运行时查询比条件宏更简洁，两个分支结构完全相同只是 WHERE 不同
+        let records = if let Some(rid) = route_id {
+            sqlx::query_as::<_, DeliveryRecord>(
+                r#"
+                SELECT id, route_id, trace_id, idempotency_key, request_payload,
+                       response_payload, status, retry_count, next_retry_at,
+                       error_message, created_at, updated_at
+                FROM delivery_records
+                WHERE status = 'dead' AND route_id = $1
+                ORDER BY updated_at DESC
+                LIMIT $2 OFFSET $3
+                "#,
+            )
+            .bind(rid)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(&self.pool)
+            .await?
+        } else {
+            sqlx::query_as::<_, DeliveryRecord>(
+                r#"
+                SELECT id, route_id, trace_id, idempotency_key, request_payload,
+                       response_payload, status, retry_count, next_retry_at,
+                       error_message, created_at, updated_at
+                FROM delivery_records
+                WHERE status = 'dead'
+                ORDER BY updated_at DESC
+                LIMIT $1 OFFSET $2
+                "#,
+            )
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(&self.pool)
+            .await?
+        };
+        Ok(records)
+    }
+
+    async fn get_delivery_record(&self, id: Uuid) -> Result<DeliveryRecord, AppError> {
+        let record = sqlx::query_as::<_, DeliveryRecord>(
+            r#"
+            SELECT id, route_id, trace_id, idempotency_key, request_payload,
+                   response_payload, status, retry_count, next_retry_at,
+                   error_message, created_at, updated_at
+            FROM delivery_records WHERE id = $1
+            "#,
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("DeliveryRecord {id} not found")))?;
+        Ok(record)
+    }
+
+    async fn check_idempotency(&self, key: &str) -> Result<Option<IdempotencyRecord>, AppError> {
+        let record = sqlx::query_as::<_, IdempotencyRecord>(
+            r#"
+            SELECT idempotency_key, route_id, status, response_hash, created_at
+            FROM idempotency_keys WHERE idempotency_key = $1
+            "#,
+        )
+        .bind(key)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(record)
+    }
+
+    async fn create_idempotency_record(&self, key: &str, route_id: Uuid) -> Result<(), AppError> {
+        // ON CONFLICT DO NOTHING 防止并发请求中第二个写入报错；
+        // 幂等键冲突时业务层已在 check_idempotency 中处理，此处静默忽略即可
+        sqlx::query(
+            r#"
+            INSERT INTO idempotency_keys (idempotency_key, route_id)
+            VALUES ($1, $2)
+            ON CONFLICT (idempotency_key) DO NOTHING
+            "#,
+        )
+        .bind(key)
+        .bind(route_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    async fn mark_idempotency_delivered(
+        &self,
+        key: &str,
+        response_hash: &str,
+    ) -> Result<(), AppError> {
+        // response_hash 存储响应摘要而非完整响应体，避免大响应占用 idempotency_keys 表空间
+        sqlx::query(
+            r#"
+            UPDATE idempotency_keys
+            SET status = 'delivered', response_hash = $2
+            WHERE idempotency_key = $1
+            "#,
+        )
+        .bind(key)
+        .bind(response_hash)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    async fn get_route(&self, id: Uuid) -> Result<Route, AppError> {
+        // fetch_optional 区分"未找到"与数据库错误，明确返回 404 而非 500
+        let route = sqlx::query_as::<_, Route>(
+            r#"
+            SELECT id, contract_id, method,
+                   path, request_schema, response_schema, transform_rules,
+                   backend_binding_id, delivery_guarantee,
+                   enabled, created_at, updated_at
+            FROM routes WHERE id = $1
+            "#,
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Route {id} not found")))?;
+        Ok(route)
+    }
+
     async fn list_active_routes_with_bindings(&self) -> Result<Vec<RouteWithBinding>, AppError> {
         // 使用运行时查询而非宏，避免编译时对 enum 联合类型注解的复杂依赖
         // JOIN 查询确保只返回已配置后端绑定的路由，孤立路由不会出现在路由表中

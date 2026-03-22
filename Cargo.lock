@@ -124,6 +124,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "api-anything-compensation"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "api-anything-common",
+ "api-anything-metadata",
+ "chrono",
+ "dotenvy",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "api-anything-gateway"
 version = "0.1.0"
 dependencies = [
@@ -219,14 +236,17 @@ dependencies = [
 name = "api-anything-sandbox"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "api-anything-common",
  "api-anything-gateway",
  "api-anything-metadata",
  "axum 0.8.8",
  "chrono",
+ "dotenvy",
  "rand 0.8.5",
  "serde",
  "serde_json",
+ "sqlx",
  "thiserror 2.0.18",
  "tokio",
  "tracing",

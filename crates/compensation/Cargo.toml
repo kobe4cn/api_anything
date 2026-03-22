@@ -1,0 +1,20 @@
+[package]
+name = "api-anything-compensation"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+api-anything-common = { path = "../common" }
+api-anything-metadata = { path = "../metadata" }
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+sqlx.workspace = true
+dotenvy = "0.15"
+tokio = { workspace = true, features = ["full"] }
