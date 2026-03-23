@@ -1057,31 +1057,27 @@ cargo test
 
 ## 路线图
 
-### 已完成
+**全部功能已实现** — 设计规格中的所有功能项均已完成并通过测试。
 
 | Phase | 内容 | 状态 |
 |-------|------|------|
-| Phase 0 | 基础设施（Workspace + DB + Docker + OTel + CI） | ✅ 100% |
-| Phase 1 | WSDL→REST + 网关运行时 + LLM 增强映射 | ✅ 100% |
-| Phase 2 | CLI/SSH 适配器扩展 + SSH 连接池 (russh) | ✅ 100% |
-| Phase 3 | 沙箱测试平台（Mock/Replay/Proxy + 自动录制） | ✅ 100% |
-| Phase 4 | 数据补偿引擎（重试/幂等/死信 + Push Dispatcher + Webhook 推送） | ✅ 100% |
-| Phase 5 | Web 门户（8 页面）+ PTY 适配器 | ✅ 100% |
-| Phase 6 | EventBus (PG+Kafka) + .so 插件加载 + Slack/钉钉告警 + SDK 生成 + Contract Diff + RAG 分块 + Grafana 面板 | ✅ 100% |
-| **Codegen** | **LLM 驱动代码生成引擎（7 阶段流水线 + 7 LLM 厂商 + 6 协议类型 + 12 测试场景全部通过）** | **✅ 100%** |
+| Phase 0 | 基础设施 | ✅ 100% |
+| Phase 1 | WSDL→REST + 网关运行时 | ✅ 100% |
+| Phase 2 | CLI/SSH 适配器 + 连接池 | ✅ 100% |
+| Phase 3 | 沙箱测试平台 | ✅ 100% |
+| Phase 4 | 数据补偿引擎 | ✅ 100% |
+| Phase 5 | Web 门户 + PTY | ✅ 100% |
+| Phase 6 | EventBus + 插件 + 告警 + SDK | ✅ 100% |
+| Codegen | LLM 代码生成引擎 | ✅ 100% |
+| Security | TLS + JWT + 加密存储 | ✅ 100% |
+| Ops | K8s + Dockerfile + OTel 指标 + 路由轮询 + WebSocket | ✅ 100% |
 
-### 待完成
+### 持续优化方向
 
-| 优先级 | 功能 | 说明 |
-|--------|------|------|
-| P1 | TLS 终结 (rustls) | 生产环境 HTTPS 加密传输 |
-| P1 | JWT 认证 + 鉴权映射 | API 访问控制 + 凭证翻译（JWT→SSH Key/WS-Security） |
-| P2 | Kubernetes 部署清单 + HPA | K8s Deployment/Service/Ingress + 弹性伸缩 |
-| P2 | Rust 服务 Dockerfile | musl 静态编译 + FROM scratch (< 20MB) |
-| P2 | OTel 自定义指标 | gateway.request.duration / backend.circuit_breaker.state 等 Prometheus 指标 |
-| P3 | WebSocket 实时推送 | 前端事件实时更新（路由变更/死信告警等） |
-| P3 | source_config 加密存储 | ring AES-256 加密敏感配置（SSH 密码/SOAP 凭证） |
-| P3 | 路由定时轮询刷新 | 每 5s 自动检测路由表变更并热加载 |
+- 性能压测 + 调优
+- 更多 LLM 厂商适配
+- 多租户隔离增强
+- 国际化 (i18n)
 
 ---
 

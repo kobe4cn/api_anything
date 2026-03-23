@@ -2045,3 +2045,72 @@ echo "SQL leak check: $?"  # 期望: 1 (grep 未匹配)
 | 2 | 对比两个版本的合约差异 | 差异报告包含新增/删除/修改的路由和字段 |
 | 3 | 引入 Breaking Change（如删除一个必填字段或移除路由） | 差异报告明确标记为 Breaking Change |
 | 4 | 引入非 Breaking Change（如新增可选字段） | 差异报告标记为兼容变更 |
+
+### 场景 31: TLS 端到端
+
+**目标**: 验证 TLS 配置后全链路 HTTPS 通信的正确性。
+
+| 步骤 | 操作 | 预期结果 |
+|------|------|---------|
+| 1 | 生成自签名证书：`openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes` | 证书文件生成成功 |
+| 2 | 配置 `TLS_CERT_PATH=./cert.pem` 和 `TLS_KEY_PATH=./key.pem`，启动服务 | 日志显示 `Listening on https://0.0.0.0:8080 (TLS enabled)` |
+| 3 | `curl -k https://localhost:8080/health` | 200，返回健康状态 |
+| 4 | `curl http://localhost:8080/health`（HTTP 访问 HTTPS 端口） | 连接失败或协议错误 |
+| 5 | 移除 TLS 环境变量，重启服务 | 日志显示 `Listening on http://0.0.0.0:8080`，HTTP 正常工作 |
+
+### 场景 32: JWT 认证全链路
+
+**目标**: 验证 JWT 认证从配置到请求拒绝/放行的完整链路。
+
+| 步骤 | 操作 | 预期结果 |
+|------|------|---------|
+| 1 | 配置 `AUTH_ENABLED=true` 和 `JWT_SECRET=e2e-test-secret-key`，启动服务 | 服务正常启动 |
+| 2 | 无 token 请求 `GET /api/v1/projects` | 401 Unauthorized |
+| 3 | 无 token 请求 `GET /health` | 200（白名单路径） |
+| 4 | 无 token 请求 `GET /health/ready` | 200（白名单路径） |
+| 5 | 无 token 请求 `GET /api/v1/docs` | 200（白名单路径） |
+| 6 | 使用正确 secret 签发有效 JWT（HS256，exp 为未来时间） | token 生成成功 |
+| 7 | 带 `Authorization: Bearer <token>` 请求 `GET /api/v1/projects` | 200，正常返回数据 |
+| 8 | 使用过期 JWT 请求 | 401 Unauthorized |
+| 9 | 使用错误 secret 签发的 JWT 请求 | 401 Unauthorized |
+| 10 | 配置 `AUTH_ENABLED=false`，重启，无 token 请求 | 200（认证关闭，所有请求放行） |
+
+### 场景 33: WebSocket 事件推送
+
+**目标**: 验证 WebSocket 连接建立、事件推送和断线重连的完整链路。
+
+| 步骤 | 操作 | 预期结果 |
+|------|------|---------|
+| 1 | 启动服务，确保数据库中有 events 表 | 服务正常启动 |
+| 2 | `wscat -c ws://localhost:8080/ws` 建立 WebSocket 连接 | 连接成功 |
+| 3 | 通过 CLI 执行 `api-anything generate --wsdl samples/calculator.wsdl` | 生成路由，events 表新增记录 |
+| 4 | 观察 WebSocket 客户端收到的消息 | 收到 JSON 格式事件，包含 id/type/payload/timestamp 字段 |
+| 5 | 断开 WebSocket 连接后重新连接 | 重连后收到断开期间产生的新事件 |
+| 6 | 打开前端 Web 页面，观察实时通知 | 页面显示路由变更通知（通过 useWebSocket hook） |
+
+### 场景 34: 加密存储全链路
+
+**目标**: 验证敏感配置的加密存储和解密读取的完整链路。
+
+| 步骤 | 操作 | 预期结果 |
+|------|------|---------|
+| 1 | 生成加密密钥：`openssl rand -hex 32` | 输出 64 个 hex 字符 |
+| 2 | 配置 `ENCRYPTION_KEY=<上一步输出>`，启动服务 | 服务正常启动 |
+| 3 | 通过 CLI 生成 SSH 类型路由（包含 SSH 密码等敏感配置） | 路由生成成功 |
+| 4 | 查询数据库 `SELECT endpoint_config FROM backend_bindings` | 敏感字段为 hex 编码密文，非明文 |
+| 5 | 通过网关调用该路由 | 200，服务能正确解密并使用凭证（后端正常响应） |
+| 6 | 移除 `ENCRYPTION_KEY`，重启服务 | 已加密数据无法解密，调用返回错误 |
+| 7 | 不配置 `ENCRYPTION_KEY`，新建 binding | endpoint_config 明文存储（向后兼容） |
+
+### 场景 35: 路由热加载
+
+**目标**: 验证路由轮询机制在不重启服务的情况下自动加载新路由。
+
+| 步骤 | 操作 | 预期结果 |
+|------|------|---------|
+| 1 | 配置 `ROUTE_POLL_INTERVAL_SECS=2`，启动服务 | 日志显示 `Route polling task started` |
+| 2 | 记录当前路由数量（观察启动日志 `Gateway routes loaded`） | 如 routes=5 |
+| 3 | 通过 CLI 生成新路由：`api-anything generate --wsdl samples/new-service.wsdl` | 路由写入数据库 |
+| 4 | 等待 2-3 秒，观察服务日志 | 出现 `Routes hot-reloaded routes=N`（N > 之前数量） |
+| 5 | 访问新生成的路由端点 | 200（路由已生效，无需重启） |
+| 6 | 通过 API 删除路由，等待轮询间隔 | 再次访问已删除路由返回 404（路由已移除） |

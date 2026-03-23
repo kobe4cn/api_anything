@@ -26,6 +26,14 @@
 - [6. 监控与可观测性](#6-监控与可观测性)
 - [7. LLM 增强功能](#7-llm-增强功能)
 - [8. 常见问题 (FAQ)](#8-常见问题-faq)
+- [9. 安全配置](#9-安全配置)
+  - [9.1 TLS/HTTPS 配置](#91-tlshttps-配置)
+  - [9.2 JWT 认证配置](#92-jwt-认证配置)
+  - [9.3 敏感数据加密](#93-敏感数据加密)
+- [10. 运维配置](#10-运维配置)
+  - [10.1 路由热加载](#101-路由热加载)
+  - [10.2 WebSocket 实时推送](#102-websocket-实时推送)
+  - [10.3 OTel 自定义指标](#103-otel-自定义指标)
 
 ---
 
@@ -1407,6 +1415,154 @@ KAFKA_BROKERS=localhost:9092
 ```
 
 PG 模式下事件直接写入 PostgreSQL 表并通过轮询消费，适用于中小规模部署。Kafka 模式适用于高吞吐、多消费者场景。
+
+---
+
+## 9. 安全配置
+
+### 9.1 TLS/HTTPS 配置
+
+**何时需要**：生产环境必须开启，确保传输层加密。
+
+**如何配置**：
+
+```bash
+# 生成自签名证书（开发测试用）
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
+
+# .env 配置
+TLS_CERT_PATH=./cert.pem
+TLS_KEY_PATH=./key.pem
+```
+
+- 两个路径**同时配置**时启用 HTTPS，启动日志显示 `Listening on https://...`
+- 不配置时自动使用 HTTP（开发模式），启动日志显示 `Listening on http://...`
+- TLS 实现基于 `axum-server` + `rustls`，无需 OpenSSL 运行时依赖
+
+> **注意**：只配置其中一个路径（cert 或 key）不会生效，系统仍以 HTTP 模式启动。
+
+### 9.2 JWT 认证配置
+
+**何时需要**：对外暴露 API 时必须开启，阻止未授权访问。
+
+**如何配置**：
+
+```bash
+AUTH_ENABLED=true
+JWT_SECRET=your-production-secret-at-least-256-bits
+```
+
+**白名单路径**（无需 token 即可访问）：
+- `/health` — 存活探针（K8s liveness probe）
+- `/health/ready` — 就绪探针（K8s readiness probe）
+- `/api/v1/docs` — Swagger UI 文档页面
+
+**如何获取 token**：由外部身份提供方（如 Keycloak、Auth0、自建 IdP）签发 HS256 JWT。
+
+**请求示例**：
+
+```bash
+curl -H "Authorization: Bearer eyJhbG..." http://localhost:8080/gw/api/v1/orders
+```
+
+**Claims 结构**：
+
+```json
+{
+  "sub": "user-id",
+  "role": "admin",
+  "exp": 1234567890
+}
+```
+
+- `sub`（必填）：用户唯一标识
+- `role`（可选）：用户角色，注入到请求 extensions 供下游 handler 消费
+- `exp`（必填）：过期时间戳（Unix epoch 秒）
+
+**未认证请求响应**：返回 `401 Unauthorized`。
+
+> **开发模式**：`AUTH_ENABLED` 默认为 `false`，开发环境无需配置 JWT 即可正常使用所有 API。
+
+### 9.3 敏感数据加密
+
+**何时需要**：存储 SSH 密码、SOAP 凭证等敏感信息时，避免数据库中明文暴露。
+
+**如何配置**：
+
+```bash
+# 生成 256-bit 密钥（64 个 hex 字符）
+openssl rand -hex 32
+# 输出类似：a1b2c3d4e5f6...
+
+ENCRYPTION_KEY=a1b2c3d4e5f6...
+```
+
+- **加密算法**：AES-256-GCM（通过 `ring` 库实现）
+- **加密范围**：`BackendBinding.endpoint_config` 中的敏感字段
+- **不配置时**：明文存储（向后兼容，开发环境零配置可用）
+- **随机 nonce**：每次加密使用随机 12 字节 nonce，相同明文产生不同密文
+
+> **警告**：密钥丢失将**无法解密**已加密的数据，请妥善备份 `ENCRYPTION_KEY`。
+
+---
+
+## 10. 运维配置
+
+### 10.1 路由热加载
+
+平台内置路由轮询机制，无需重启即可感知路由变更。
+
+- **默认间隔**：每 5 秒检查数据库中的路由变更
+- **配置轮询间隔**：`ROUTE_POLL_INTERVAL_SECS=5`（单位：秒）
+- **工作原理**：比较路由数量 → 有变化时通过 `RouteLoader` 原子替换路由表 → 零停机
+- **使用场景**：通过 CLI `generate` / `generate-ssh` / `generate-cli` 生成新路由后，网关自动感知并加载，无需重启服务
+
+**日志示例**：
+```
+INFO Routes hot-reloaded routes=12
+```
+
+### 10.2 WebSocket 实时推送
+
+平台提供 WebSocket 端点用于实时事件推送，Web 面板通过此连接展示路由变更、死信告警等实时通知。
+
+- **端点**：`ws://localhost:8080/ws`（开启 TLS 时为 `wss://localhost:8080/ws`）
+- **推送机制**：服务端每 2 秒轮询 `events` 表，推送新事件给所有连接的客户端
+- **事件类型**：RouteUpdated、DeliveryFailed、DeadLetter、GenerationCompleted 等
+- **前端自动连接**：通过 `useWebSocket` hook 自动建立连接，断线 3 秒后自动重连
+- **多副本安全**：基于数据库轮询而非内存广播，多实例部署时事件不丢失
+
+**事件消息格式**：
+
+```json
+{
+  "id": "uuid",
+  "type": "RouteUpdated",
+  "payload": { ... },
+  "timestamp": "2026-03-23T10:00:00Z"
+}
+```
+
+**命令行测试**：
+
+```bash
+# 使用 wscat 连接
+wscat -c ws://localhost:8080/ws
+```
+
+### 10.3 OTel 自定义指标
+
+网关自动暴露以下 Prometheus 指标，通过 OpenTelemetry Collector 推送到 Prometheus，Grafana Dashboard 自动展示。
+
+| 指标名 | 类型 | 说明 |
+|--------|------|------|
+| `gateway_request_total` | Counter | 网关请求总量（按 route/method/status 分组） |
+| `gateway_request_duration_seconds` | Histogram | 网关请求端到端延迟分布（含路由匹配 + 后端调用 + 响应序列化） |
+| `backend_execute_duration_seconds` | Histogram | 后端协议调用延迟分布（仅 adapter.execute 部分，按 route/protocol 分组） |
+| `delivery_retry_total` | Counter | 投递重试次数（监控重试风暴） |
+| `delivery_dead_letter_total` | Counter | 死信数量（超过阈值应触发告警） |
+
+**OTel Collector 配置**：通过 `OTEL_EXPORTER_OTLP_ENDPOINT`（默认 `http://localhost:4317`）将指标和链路数据推送到 Collector。
 
 ---
 

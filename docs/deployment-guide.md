@@ -874,6 +874,74 @@ Grafana 中已配置 Tempo 数据源的跨源跳转：
 - trace → logs：通过 `trace_id` 关联到 Loki
 - trace → metrics：关联到 Prometheus
 
+### 5.10 Docker 快速部署
+
+```bash
+# 构建 Rust 服务镜像（多阶段构建，最终镜像 < 20MB）
+docker build -t api-anything:latest .
+
+# 运行（需要外部 PostgreSQL）
+docker run -d \
+  -e DATABASE_URL=postgres://user:pass@db-host:5432/api_anything \
+  -e AUTH_ENABLED=true \
+  -e JWT_SECRET=your-secret \
+  -e TLS_CERT_PATH=/certs/cert.pem \
+  -e TLS_KEY_PATH=/certs/key.pem \
+  -v /path/to/certs:/certs:ro \
+  -p 443:8080 \
+  api-anything:latest
+```
+
+> Dockerfile 使用 `rust:1.82-alpine` 编译，`FROM scratch` 运行，内置 CA 证书以支持 HTTPS 外部调用。
+
+### 5.11 Kubernetes 快速部署
+
+项目提供完整的 K8s 部署清单位于 `deploy/k8s/` 目录：
+
+```bash
+# 创建命名空间
+kubectl apply -f deploy/k8s/namespace.yaml
+
+# 配置（修改 configmap.yaml 和 secret.yaml 中的值）
+kubectl apply -f deploy/k8s/configmap.yaml
+kubectl apply -f deploy/k8s/secret.yaml
+
+# 部署服务
+kubectl apply -f deploy/k8s/deployment.yaml
+kubectl apply -f deploy/k8s/service.yaml
+kubectl apply -f deploy/k8s/hpa.yaml
+kubectl apply -f deploy/k8s/ingress.yaml
+
+# 验证
+kubectl -n api-anything get pods
+kubectl -n api-anything get hpa
+```
+
+**HPA 弹性伸缩说明**（对应 `deploy/k8s/hpa.yaml`）：
+- 最小副本：2（高可用）
+- 最大副本：20
+- CPU 阈值：70%
+- 内存阈值：80%
+- 扩缩延迟：默认 Kubernetes 配置
+
+**Secret 包含的敏感配置**（对应 `deploy/k8s/secret.yaml`）：
+- `DATABASE_PASSWORD` — 数据库密码
+- `LLM_API_KEY` — LLM 厂商 API Key
+- `JWT_SECRET` — JWT 签名密钥
+- `ENCRYPTION_KEY` — AES-256 加密密钥
+
+### 5.12 安全加固检查清单
+
+生产环境上线前，请确认以下安全项均已配置：
+
+- [ ] **TLS 证书配置** — `TLS_CERT_PATH` + `TLS_KEY_PATH`（或通过 Ingress 终结 TLS）
+- [ ] **JWT 认证开启** — `AUTH_ENABLED=true` + 强密钥（至少 256-bit）
+- [ ] **敏感数据加密** — `ENCRYPTION_KEY` 配置（64 个 hex 字符）
+- [ ] **数据库密码不硬编码** — 使用 K8s Secret 或 Vault 注入
+- [ ] **LLM API Key 保护** — 使用 K8s Secret，不写入 ConfigMap
+- [ ] **RUST_LOG 级别** — 生产环境设为 `info`，避免 debug 日志泄露敏感信息
+- [ ] **健康检查端点** — 确认 `/health` 和 `/health/ready` 可达（K8s 探针依赖）
+
 ---
 
 ## 6. 运维手册

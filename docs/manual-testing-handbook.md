@@ -780,3 +780,108 @@ curl -v -X POST http://localhost:8080/api/v1/plugins/scan
 | WEB-015 | Webhook Manager | 浏览器访问 `/webhooks` | 显示订阅表格 | 表格包含 URL、Event Types、Description、Actions 列 |
 | WEB-016 | SDK Generator | 在 `/docs` 页面切换到 SDK Generator tab | 显示代码预览区域 | 语言下拉列表含 TypeScript、Python、Java、Go 四个选项 |
 | WEB-017 | Monitoring | 浏览器访问 `/monitoring` | 显示 Grafana iframe | iframe 正确嵌入 Grafana 仪表盘；需 Grafana 服务运行 |
+
+---
+
+## 9. 新功能测试用例
+
+### 9.1 TLS 测试
+
+| 编号 | 用例名称 | 步骤 | 预期结果 |
+|------|---------|------|---------|
+| TLS-001 | HTTPS 访问 | 配置 `TLS_CERT_PATH` 和 `TLS_KEY_PATH` → 重启服务 → `curl -k https://localhost:8080/health` | 200，日志显示 `Listening on https://...` |
+| TLS-002 | 无证书 HTTP | 不配置 TLS 环境变量 → 启动服务 | HTTP 正常工作，日志显示 `Listening on http://...` |
+
+**cURL 示例**:
+
+```bash
+# TLS-001: HTTPS 访问（自签名证书需 -k 跳过验证）
+TLS_CERT_PATH=./cert.pem TLS_KEY_PATH=./key.pem cargo run -p api-anything-platform-api
+curl -k https://localhost:8080/health
+
+# TLS-002: 无证书 HTTP
+cargo run -p api-anything-platform-api
+curl http://localhost:8080/health
+```
+
+### 9.2 JWT 认证测试
+
+| 编号 | 用例名称 | 步骤 | 预期结果 |
+|------|---------|------|---------|
+| JWT-001 | 无 token 访问 | `AUTH_ENABLED=true` → 不带 Authorization header 请求 `/api/v1/projects` | 401 Unauthorized |
+| JWT-002 | 有效 token | 使用正确 secret 签发未过期 JWT → 带 Bearer token 请求 | 200 OK |
+| JWT-003 | 过期 token | 使用 exp 为过去时间的 JWT 请求 | 401 Unauthorized |
+| JWT-004 | 白名单路径 | `AUTH_ENABLED=true` → 无 token 访问 `/health` | 200 OK |
+| JWT-005 | 错误 secret | 使用不同 secret 签发的 JWT 请求 | 401 Unauthorized |
+
+**cURL 示例**:
+
+```bash
+# JWT-001: 无 token 访问
+AUTH_ENABLED=true JWT_SECRET=test-secret cargo run -p api-anything-platform-api &
+curl -v http://localhost:8080/api/v1/projects
+# 预期：401
+
+# JWT-004: 白名单路径无需 token
+curl http://localhost:8080/health
+# 预期：200
+```
+
+### 9.3 WebSocket 测试
+
+| 编号 | 用例名称 | 步骤 | 预期结果 |
+|------|---------|------|---------|
+| WS-001 | 连接建立 | `wscat -c ws://localhost:8080/ws` | 连接成功，收到初始事件快照 |
+| WS-002 | 事件推送 | 连接 WS 后，通过 CLI 生成新路由 | 收到 RouteUpdated 等事件消息 |
+| WS-003 | 断线重连 | 前端页面打开后杀掉服务端 → 重启服务端 | 3 秒后自动重连 |
+
+**测试示例**:
+
+```bash
+# WS-001: 使用 wscat 连接
+npm install -g wscat
+wscat -c ws://localhost:8080/ws
+
+# 观察收到的 JSON 消息格式：
+# {"id":"uuid","type":"RouteUpdated","payload":{...},"timestamp":"..."}
+```
+
+### 9.4 加密存储测试
+
+| 编号 | 用例名称 | 步骤 | 预期结果 |
+|------|---------|------|---------|
+| ENC-001 | 加密存储 | 配置 `ENCRYPTION_KEY`（64 hex 字符） → 创建包含敏感配置的 binding → 查询数据库 | endpoint_config 中敏感字段为密文 |
+| ENC-002 | 无 key 明文 | 不配置 `ENCRYPTION_KEY` → 创建 binding → 查询数据库 | endpoint_config 中为明文（向后兼容） |
+
+**测试示例**:
+
+```bash
+# 生成 256-bit 密钥
+export ENCRYPTION_KEY=$(openssl rand -hex 32)
+
+# 创建 binding 后检查数据库
+psql -d api_anything -c "SELECT endpoint_config FROM backend_bindings LIMIT 1;"
+# 配置了 ENCRYPTION_KEY 时，敏感字段应为 hex 编码的密文
+```
+
+### 9.5 路由轮询测试
+
+| 编号 | 用例名称 | 步骤 | 预期结果 |
+|------|---------|------|---------|
+| POLL-001 | 自动加载 | 启动服务 → 通过 CLI 生成新路由 → 等待 5 秒 → 访问新路由 | 200（无需重启服务） |
+| POLL-002 | 自定义间隔 | 设置 `ROUTE_POLL_INTERVAL_SECS=1` → 生成路由 → 1 秒后访问 | 1 秒内生效 |
+
+**测试示例**:
+
+```bash
+# 启动服务后，通过 CLI 生成新路由
+api-anything generate --wsdl ./samples/calculator.wsdl --project test
+
+# 等待轮询间隔后访问新路由
+sleep 5
+curl http://localhost:8080/gw/api/v1/calculator/add -X POST -H "Content-Type: application/json" -d '{"a":1,"b":2}'
+# 预期：200（路由已自动热加载）
+
+# 观察日志确认热加载
+# INFO Routes hot-reloaded routes=N
+```
