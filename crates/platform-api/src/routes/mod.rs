@@ -8,3 +8,4 @@ pub mod recordings;
 pub mod sandbox;
 pub mod sandbox_sessions;
 pub mod webhooks;
+pub mod ws;
