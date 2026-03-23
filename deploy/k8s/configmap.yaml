@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-anything-config
+  namespace: api-anything
+data:
+  DATABASE_URL: "postgres://api_anything:api_anything@postgres:5432/api_anything"
+  API_HOST: "0.0.0.0"
+  API_PORT: "8080"
+  EVENT_BUS_TYPE: "memory"
+  RUST_LOG: "info,api_anything=debug"
+  ROUTE_POLL_INTERVAL_SECS: "5"

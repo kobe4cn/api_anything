@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-anything
+  namespace: api-anything
+  labels:
+    app: api-anything
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-anything
+  template:
+    metadata:
+      labels:
+        app: api-anything
+    spec:
+      containers:
+        - name: api-anything
+          image: api-anything:latest
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: api-anything-config
+            - secretRef:
+                name: api-anything-secret
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
