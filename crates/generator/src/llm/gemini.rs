@@ -52,7 +52,7 @@ impl LlmClient for GeminiClient {
                 }],
                 "generationConfig": {
                     "temperature": 0.1,
-                    "maxOutputTokens": 4096
+                    "maxOutputTokens": 16384
                 }
             });
 

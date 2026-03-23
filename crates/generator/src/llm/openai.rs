@@ -47,7 +47,7 @@ impl LlmClient for OpenAiCompatibleClient {
                     {"role": "user", "content": user_prompt}
                 ],
                 "temperature": 0.1,
-                "max_tokens": 4096
+                "max_tokens": 16384
             });
 
             // 重试机制：超时/500/429 自动重试，最多 3 次，间隔递增

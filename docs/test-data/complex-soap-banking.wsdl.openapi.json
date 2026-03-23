@@ -1,0 +1,908 @@
+{
+  "info": {
+    "title": "retest-complex-soap API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/gw/account": {
+      "post": {
+        "operationId": "createAccount",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "account_type": {
+                    "type": "string"
+                  },
+                  "branch_code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "initial_deposit": {
+                    "properties": {
+                      "amount": {
+                        "type": "string"
+                      },
+                      "currency_code": {
+                        "type": "string"
+                      },
+                      "precision": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "amount",
+                      "currency_code",
+                      "precision"
+                    ],
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  },
+                  "owner": {
+                    "properties": {
+                      "address": {
+                        "properties": {
+                          "city": {
+                            "type": "string"
+                          },
+                          "country_code": {
+                            "type": "string"
+                          },
+                          "postal_code": {
+                            "type": "string"
+                          },
+                          "state_province": {
+                            "type": "string"
+                          },
+                          "street_line1": {
+                            "type": "string"
+                          },
+                          "street_line2": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "street_line1",
+                          "city",
+                          "state_province",
+                          "postal_code",
+                          "country_code"
+                        ],
+                        "type": "object"
+                      },
+                      "date_of_birth": {
+                        "type": "string"
+                      },
+                      "email": {
+                        "type": "string"
+                      },
+                      "full_name": {
+                        "type": "string"
+                      },
+                      "national_id": {
+                        "type": "string"
+                      },
+                      "owner_id": {
+                        "type": "string"
+                      },
+                      "phone": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "owner_id",
+                      "full_name",
+                      "national_id",
+                      "date_of_birth",
+                      "email",
+                      "phone",
+                      "address"
+                    ],
+                    "type": "object"
+                  },
+                  "preferred_currency": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "owner",
+                  "account_type",
+                  "preferred_currency"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "account_number": {
+                      "type": "string"
+                    },
+                    "account_type": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "iban": {
+                      "type": "string"
+                    },
+                    "kyc_status": {
+                      "type": "string"
+                    },
+                    "swift_bic": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "account_number",
+                    "account_type",
+                    "iban",
+                    "swift_bic",
+                    "created_at",
+                    "kyc_status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Creates a new bank account for a specified owner with optional initial deposit."
+      }
+    },
+    "/gw/account/close": {
+      "post": {
+        "operationId": "closeAccount",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "account_number": {
+                    "type": "string"
+                  },
+                  "authorized_by": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "transfer_balance_to": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "account_number",
+                  "reason",
+                  "authorized_by"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "account_number": {
+                      "type": "string"
+                    },
+                    "balance_transfer_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "closed_at": {
+                      "type": "string"
+                    },
+                    "confirmation_number": {
+                      "type": "string"
+                    },
+                    "final_balance": {
+                      "properties": {
+                        "amount": {
+                          "type": "string"
+                        },
+                        "currency_code": {
+                          "type": "string"
+                        },
+                        "precision": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "amount",
+                        "currency_code",
+                        "precision"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "account_number",
+                    "closed_at",
+                    "final_balance",
+                    "confirmation_number"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Closes an existing bank account with optional balance transfer."
+      }
+    },
+    "/gw/balance": {
+      "post": {
+        "operationId": "getBalance",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "account_number": {
+                    "type": "string"
+                  },
+                  "target_currency": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "account_number"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "account_number": {
+                      "type": "string"
+                    },
+                    "account_type": {
+                      "type": "string"
+                    },
+                    "as_of_datetime": {
+                      "type": "string"
+                    },
+                    "available_balance": {
+                      "properties": {
+                        "amount": {
+                          "type": "string"
+                        },
+                        "currency_code": {
+                          "type": "string"
+                        },
+                        "precision": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "amount",
+                        "currency_code",
+                        "precision"
+                      ],
+                      "type": "object"
+                    },
+                    "frozen_amount": {
+                      "properties": {
+                        "amount": {
+                          "type": "string"
+                        },
+                        "currency_code": {
+                          "type": "string"
+                        },
+                        "precision": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "amount",
+                        "currency_code",
+                        "precision"
+                      ],
+                      "type": "object"
+                    },
+                    "ledger_balance": {
+                      "properties": {
+                        "amount": {
+                          "type": "string"
+                        },
+                        "currency_code": {
+                          "type": "string"
+                        },
+                        "precision": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "amount",
+                        "currency_code",
+                        "precision"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "account_number",
+                    "account_type",
+                    "available_balance",
+                    "ledger_balance",
+                    "frozen_amount",
+                    "as_of_datetime"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Retrieves account balance information including available and ledger balances."
+      }
+    },
+    "/gw/exchange-rate": {
+      "post": {
+        "operationId": "getExchangeRate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "from_currency": {
+                    "type": "string"
+                  },
+                  "rate_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "to_currency": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from_currency",
+                  "to_currency"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "buy_rate": {
+                      "type": "string"
+                    },
+                    "from_currency": {
+                      "type": "string"
+                    },
+                    "mid_rate": {
+                      "type": "string"
+                    },
+                    "rate": {
+                      "type": "string"
+                    },
+                    "rate_precision": {
+                      "type": "integer"
+                    },
+                    "rate_timestamp": {
+                      "type": "string"
+                    },
+                    "sell_rate": {
+                      "type": "string"
+                    },
+                    "to_currency": {
+                      "type": "string"
+                    },
+                    "valid_until": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "from_currency",
+                    "to_currency",
+                    "rate",
+                    "rate_precision",
+                    "buy_rate",
+                    "sell_rate",
+                    "mid_rate",
+                    "rate_timestamp",
+                    "valid_until"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Retrieves currency exchange rates including buy, sell, and mid rates."
+      }
+    },
+    "/gw/statement": {
+      "post": {
+        "operationId": "getStatement",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "account_number": {
+                    "type": "string"
+                  },
+                  "from_date": {
+                    "type": "string"
+                  },
+                  "page": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "page_size": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "to_date": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "account_number",
+                  "from_date",
+                  "to_date"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "account_number": {
+                      "type": "string"
+                    },
+                    "closing_balance": {
+                      "properties": {
+                        "amount": {
+                          "type": "string"
+                        },
+                        "currency_code": {
+                          "type": "string"
+                        },
+                        "precision": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "amount",
+                        "currency_code",
+                        "precision"
+                      ],
+                      "type": "object"
+                    },
+                    "opening_balance": {
+                      "properties": {
+                        "amount": {
+                          "type": "string"
+                        },
+                        "currency_code": {
+                          "type": "string"
+                        },
+                        "precision": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "amount",
+                        "currency_code",
+                        "precision"
+                      ],
+                      "type": "object"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "page_size": {
+                      "type": "integer"
+                    },
+                    "period_from": {
+                      "type": "string"
+                    },
+                    "period_to": {
+                      "type": "string"
+                    },
+                    "total_count": {
+                      "type": "integer"
+                    },
+                    "total_credits": {
+                      "properties": {
+                        "amount": {
+                          "type": "string"
+                        },
+                        "currency_code": {
+                          "type": "string"
+                        },
+                        "precision": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "amount",
+                        "currency_code",
+                        "precision"
+                      ],
+                      "type": "object"
+                    },
+                    "total_debits": {
+                      "properties": {
+                        "amount": {
+                          "type": "string"
+                        },
+                        "currency_code": {
+                          "type": "string"
+                        },
+                        "precision": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "amount",
+                        "currency_code",
+                        "precision"
+                      ],
+                      "type": "object"
+                    },
+                    "transactions": {
+                      "items": {
+                        "properties": {
+                          "amount": {
+                            "properties": {
+                              "amount": {
+                                "type": "string"
+                              },
+                              "currency_code": {
+                                "type": "string"
+                              },
+                              "precision": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "amount",
+                              "currency_code",
+                              "precision"
+                            ],
+                            "type": "object"
+                          },
+                          "balance_after": {
+                            "properties": {
+                              "amount": {
+                                "type": "string"
+                              },
+                              "currency_code": {
+                                "type": "string"
+                              },
+                              "precision": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "amount",
+                              "currency_code",
+                              "precision"
+                            ],
+                            "type": "object"
+                          },
+                          "counterparty_account": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "counterparty_name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "reference_no": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "timestamp": {
+                            "type": "string"
+                          },
+                          "transaction_id": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "value_date": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "transaction_id",
+                          "type",
+                          "amount",
+                          "balance_after",
+                          "description",
+                          "timestamp",
+                          "value_date"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "account_number",
+                    "period_from",
+                    "period_to",
+                    "opening_balance",
+                    "closing_balance",
+                    "total_credits",
+                    "total_debits",
+                    "transactions",
+                    "total_count",
+                    "page",
+                    "page_size"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Retrieves account statement transactions for a specific period with pagination."
+      }
+    },
+    "/gw/transfer": {
+      "post": {
+        "operationId": "transferFunds",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "amount": {
+                    "properties": {
+                      "amount": {
+                        "type": "string"
+                      },
+                      "currency_code": {
+                        "type": "string"
+                      },
+                      "precision": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "amount",
+                      "currency_code",
+                      "precision"
+                    ],
+                    "type": "object"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "from_account": {
+                    "type": "string"
+                  },
+                  "idempotency_key": {
+                    "type": "string"
+                  },
+                  "scheduled_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "to_account": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from_account",
+                  "to_account",
+                  "amount",
+                  "description",
+                  "idempotency_key"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "estimated_arrival": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "executed_at": {
+                      "type": "string"
+                    },
+                    "fee": {
+                      "properties": {
+                        "amount": {
+                          "type": "string"
+                        },
+                        "currency_code": {
+                          "type": "string"
+                        },
+                        "precision": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "amount",
+                        "currency_code",
+                        "precision"
+                      ],
+                      "type": "object"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "transaction_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "transaction_id",
+                    "status",
+                    "fee",
+                    "executed_at"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "502": {
+            "description": "Backend error"
+          },
+          "503": {
+            "description": "Circuit breaker open"
+          },
+          "504": {
+            "description": "Backend timeout"
+          }
+        },
+        "summary": "Transfers funds from one account to another with optional scheduling."
+      }
+    }
+  }
+}
