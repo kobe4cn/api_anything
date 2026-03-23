@@ -7,5 +7,6 @@ pub mod router;
 pub mod xml_json;
 pub mod adapters;
 pub mod loader;
+pub mod metrics;
 pub mod output_parser;
 pub mod plugin_loader;
