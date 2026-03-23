@@ -78,6 +78,8 @@ pub fn build_app(state: AppState) -> Router {
         .route("/api/v1/docs/openapi.json", get(routes::docs::openapi_json))
         .route("/api/v1/docs/agent-prompt", get(routes::docs::agent_prompt))
         .route("/api/v1/docs/sdk/{language}", get(routes::docs::generate_sdk))
+        // WebSocket 实时事件推送（前端通过 useWebSocket hook 连接）
+        .route("/ws", get(routes::ws::ws_handler))
         // 通配路由捕获所有 /gw/ 前缀请求，交由动态路由器分发
         .route("/gw/{*rest}", any(routes::gateway::gateway_handler))
         // 沙箱通配路由：与网关共享路由表，但根据 X-Sandbox-Mode 头走 mock/replay/proxy 分支
