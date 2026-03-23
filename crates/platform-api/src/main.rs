@@ -4,6 +4,7 @@ use api_anything_compensation::retry_worker::RetryWorker;
 use api_anything_gateway::dispatcher::BackendDispatcher;
 use api_anything_gateway::loader::RouteLoader;
 use api_anything_gateway::router::DynamicRouter;
+use api_anything_metadata::repo::MetadataRepo;
 use api_anything_metadata::PgMetadataRepo;
 use api_anything_platform_api::build_app;
 use api_anything_platform_api::middleware::tracing_mw;
@@ -11,6 +12,7 @@ use api_anything_platform_api::state::AppState;
 use dashmap::DashMap;
 use sqlx::PgPool;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::net::TcpListener;
 use uuid::Uuid;
 
@@ -49,6 +51,48 @@ async fn main() -> anyhow::Result<()> {
     );
     tokio::spawn(async move { retry_worker.run().await });
     tracing::info!("Retry worker started");
+
+    // 路由热加载轮询：定期检查数据库中路由数量是否变化，有变化时原子替换路由表，
+    // 实现新增/删除路由后无需重启即可生效
+    let poll_repo = repo.clone();
+    let poll_router = router.clone();
+    let poll_dispatchers = dispatchers.clone();
+    tokio::spawn(async move {
+        let poll_interval = Duration::from_secs(
+            std::env::var("ROUTE_POLL_INTERVAL_SECS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(5),
+        );
+        let mut last_count: usize = 0;
+        let mut interval = tokio::time::interval(poll_interval);
+        loop {
+            interval.tick().await;
+            let poll_result = poll_repo.list_active_routes_with_bindings().await;
+            match poll_result {
+                Ok(routes) if routes.len() != last_count => {
+                    match RouteLoader::load(
+                        poll_repo.as_ref(),
+                        &poll_router,
+                        &poll_dispatchers,
+                    )
+                    .await
+                    {
+                        Ok(loaded) => {
+                            last_count = loaded;
+                            tracing::info!(routes = loaded, "Routes hot-reloaded");
+                        }
+                        Err(e) => tracing::error!(error = %e, "Route reload failed"),
+                    }
+                }
+                Ok(routes) => {
+                    last_count = routes.len();
+                }
+                Err(e) => tracing::warn!(error = %e, "Route poll check failed"),
+            }
+        }
+    });
+    tracing::info!("Route polling task started");
 
     let app = build_app(state);
     let addr = format!("{}:{}", config.api_host, config.api_port);
