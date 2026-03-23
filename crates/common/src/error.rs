@@ -86,6 +86,10 @@ pub enum AppError {
     // 单独作为变体而非 BadRequest 是为了在 IntoResponse 中区分并返回正确状态码
     #[error("Already delivered")]
     AlreadyDelivered,
+    // JWT 认证失败（缺少 token、签名无效、已过期）统一返回 401，
+    // 不区分具体原因以防止攻击者通过错误消息推断有效 token 格式
+    #[error("Unauthorized")]
+    Unauthorized,
 }
 
 impl IntoResponse for AppError {
@@ -148,6 +152,15 @@ impl IntoResponse for AppError {
             // 同时避免触发客户端的错误处理逻辑
             AppError::AlreadyDelivered => {
                 (StatusCode::OK, "Already delivered").into_response()
+            }
+            AppError::Unauthorized => {
+                ProblemDetail {
+                    error_type: "about:blank".to_string(),
+                    title: "Unauthorized".to_string(),
+                    status: 401,
+                    detail: Some("Missing or invalid authentication token".to_string()),
+                    instance: None,
+                }.into_response()
             }
         }
     }

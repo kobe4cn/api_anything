@@ -29,6 +29,7 @@ tracing-opentelemetry.workspace = true
 dotenvy.workspace = true
 anyhow.workspace = true
 dashmap.workspace = true
+jsonwebtoken.workspace = true
 
 [dev-dependencies]
 # axum-test 17+ 才支持 axum 0.8；16.x 依赖 axum 0.7，与工作区不兼容
