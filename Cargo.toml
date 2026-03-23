@@ -24,7 +24,8 @@ license = "MIT"
 tokio = { version = "1", features = ["full"] }
 
 # Web framework
-axum = { version = "0.8", features = ["macros"] }
+axum = { version = "0.8", features = ["macros", "ws"] }
+axum-server = { version = "0.7", features = ["tls-rustls"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["trace", "cors", "compression-gzip", "fs"] }
 
@@ -45,6 +46,9 @@ opentelemetry = "0.27"
 opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.27", features = ["tonic"] }
 tracing-opentelemetry = "0.28"
+
+# JWT authentication
+jsonwebtoken = "9"
 
 # Common utilities
 uuid = { version = "1", features = ["v4", "serde"] }
@@ -76,3 +80,6 @@ async-trait = "0.1"
 
 # Dynamic library loading
 libloading = "0.8"
+
+# Encryption
+ring = "0.17"

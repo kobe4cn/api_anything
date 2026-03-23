@@ -12,3 +12,5 @@ thiserror.workspace = true
 axum.workspace = true
 sqlx.workspace = true
 tracing.workspace = true
+anyhow.workspace = true
+ring.workspace = true
