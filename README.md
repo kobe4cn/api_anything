@@ -1062,28 +1062,26 @@ cargo test
 | Phase | 内容 | 状态 |
 |-------|------|------|
 | Phase 0 | 基础设施（Workspace + DB + Docker + OTel + CI） | ✅ 100% |
-| Phase 1 | WSDL→REST + 网关运行时 + LLM 增强映射 | ✅ 95% |
-| Phase 2 | CLI/SSH 适配器扩展 | ✅ 95% |
-| Phase 3 | 沙箱测试平台（Mock/Replay/Proxy） | ✅ 90% |
-| Phase 4 | 数据补偿引擎（重试/幂等/死信） | ✅ 85% |
-| Phase 5 | Web 门户 + PTY 适配器 | ✅ 80% |
-| Phase 6 | Explorer + SDK + Webhook + 插件 | ✅ 100% |
-| **Codegen** | **LLM 驱动代码生成引擎（7 阶段流水线 + 7 厂商 + 6 协议 + 12 场景）** | **✅ 100%** |
+| Phase 1 | WSDL→REST + 网关运行时 + LLM 增强映射 | ✅ 100% |
+| Phase 2 | CLI/SSH 适配器扩展 + SSH 连接池 (russh) | ✅ 100% |
+| Phase 3 | 沙箱测试平台（Mock/Replay/Proxy + 自动录制） | ✅ 100% |
+| Phase 4 | 数据补偿引擎（重试/幂等/死信 + Push Dispatcher + Webhook 推送） | ✅ 100% |
+| Phase 5 | Web 门户（8 页面）+ PTY 适配器 | ✅ 100% |
+| Phase 6 | EventBus (PG+Kafka) + .so 插件加载 + Slack/钉钉告警 + SDK 生成 + Contract Diff + RAG 分块 + Grafana 面板 | ✅ 100% |
+| **Codegen** | **LLM 驱动代码生成引擎（7 阶段流水线 + 7 LLM 厂商 + 6 协议类型 + 12 测试场景全部通过）** | **✅ 100%** |
 
 ### 待完成
 
 | 优先级 | 功能 | 说明 |
 |--------|------|------|
-| P1 | Kafka 事件总线 | 替换 PG 轮询，提升高吞吐场景性能 |
-| P1 | Push Dispatcher | Webhook/回调主动推送 |
-| P2 | SSH 连接池 | 高频 SSH 场景性能优化 |
-| P2 | Grafana 面板嵌入 | 在 Web 前端直接查看监控 |
-| P2 | 告警通知集成 | Slack / DingTalk 外部告警 |
-| P3 | RAG 大型 WSDL 分块 | 超大 WSDL 文件智能分块处理 |
-| P3 | TLS 双向认证 | 生产环境安全加固 |
-| P3 | JWT 认证 | API 访问控制 |
-| P4 | Kubernetes Helm Chart | K8s 一键部署 |
-| P4 | Contract Diff | 版本变更日志 + Breaking Change 检测 |
+| P1 | TLS 终结 (rustls) | 生产环境 HTTPS 加密传输 |
+| P1 | JWT 认证 + 鉴权映射 | API 访问控制 + 凭证翻译（JWT→SSH Key/WS-Security） |
+| P2 | Kubernetes 部署清单 + HPA | K8s Deployment/Service/Ingress + 弹性伸缩 |
+| P2 | Rust 服务 Dockerfile | musl 静态编译 + FROM scratch (< 20MB) |
+| P2 | OTel 自定义指标 | gateway.request.duration / backend.circuit_breaker.state 等 Prometheus 指标 |
+| P3 | WebSocket 实时推送 | 前端事件实时更新（路由变更/死信告警等） |
+| P3 | source_config 加密存储 | ring AES-256 加密敏感配置（SSH 密码/SOAP 凭证） |
+| P3 | 路由定时轮询刷新 | 每 5s 自动检测路由表变更并热加载 |
 
 ---
 
