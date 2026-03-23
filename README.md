@@ -223,6 +223,178 @@ cargo run --release -p api-anything-platform-api
 
 ---
 
+## 实战：将老系统 API 转为 REST API 的完整流程
+
+以一个真实场景为例：你的公司有一套运行了 10 年的**银行 SOAP 服务**（转账、查余额、开户等），现在需要让新的移动端 App 和 AI Agent 能够用 JSON REST 方式调用它。
+
+### Step 1: 获取老系统的接口定义
+
+从老系统获取接口描述文件。不同类型的老系统，对应不同的输入：
+
+| 老系统类型 | 你需要提供的文件 | 获取方式 |
+|-----------|----------------|---------|
+| SOAP 服务 | `.wsdl` 文件 | 访问 `http://old-server/service?wsdl` 下载 |
+| OData 服务 | `$metadata` XML | 访问 `http://old-server/$metadata` 下载 |
+| 现有 REST API | `openapi.json` / `swagger.yaml` | 从文档系统获取 |
+| CLI 命令行工具 | `--help` 输出文本 | 执行 `tool --help > tool-help.txt` |
+| SSH 远程服务器 | SSH 交互样例文本 | 手动编写或录制终端操作 |
+| 数据库/REPL 交互 | PTY 交互录制文本 | 手动编写交互命令和输出样例 |
+
+假设你已经下载了银行服务的 WSDL 文件到 `banking-service.wsdl`。
+
+### Step 2: 配置 LLM（一次性配置）
+
+编辑 `.env`，填入你的 LLM API Key：
+
+```bash
+LLM_PROVIDER=qwen          # 支持: anthropic/openai/gemini/glm/qwen/kimi/deepseek
+LLM_MODEL=qwen-max          # 各厂商默认模型见 .env.example
+QWEN_API_KEY=sk-your-key    # 填入真实 Key
+```
+
+### Step 3: 一键生成 REST API
+
+```bash
+api-anything codegen \
+  --source banking-service.wsdl \
+  --interface-type soap \
+  --project banking-api \
+  --workspace ./generated
+```
+
+**后台发生了什么（7 阶段全自动）：**
+
+```
+Stage 1: 读取 WSDL → 识别出 6 个 SOAP 操作（GetBalance/Transfer/Statement/...）
+Stage 2: LLM 分析语义 → 生成 491 行强类型 Rust 代码
+         ├── struct TransferFundsRequest { from_account: String, to_account: String, amount: MoneyAmount }
+         ├── struct MoneyAmount { amount: String, currency_code: String, precision: i32 }
+         ├── fn handle(req) → 根据路径分发到对应 SOAP 操作
+         └── SOAP XML 信封构建 + 响应解析 + 错误处理
+Stage 3: cargo build → 编译为 .so 插件（如果编译失败，自动让 LLM 修正，最多重试 5 次）
+Stage 4: LLM 生成影子测试代码
+Stage 5: LLM 提取路由信息 → 生成 OpenAPI 3.0 文档
+Stage 6: 代码中已包含 #[tracing::instrument] 链路追踪埋点
+Stage 7: 插件和路由信息写入数据库
+```
+
+**输出：**
+```
+Generation complete!
+  Routes created: 6
+  Plugin binary: ./generated/plugin-banking-api-xxx/target/release/libplugin_banking_api.dylib
+  OpenAPI spec: banking-service.wsdl.openapi.json
+  Source code: ./generated/banking-api-source.rs
+```
+
+### Step 4: 启动网关服务
+
+```bash
+# 启动 Platform API（自动加载刚生成的路由和插件）
+cargo run --release -p api-anything-platform-api
+```
+
+网关启动时自动从数据库加载路由 → 通过 PluginManager 加载 .so 插件 → 注册到 DynamicRouter。
+
+### Step 5: 用 JSON 调用转换后的 REST API
+
+老系统原来的 SOAP 调用方式（XML + SOAPAction Header）：
+```xml
+<!-- 原来需要这样调用 -->
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <TransferFunds xmlns="http://bank.example.com">
+      <FromAccount>622848001234</FromAccount>
+      <ToAccount>622848005678</ToAccount>
+      <Amount><Value>10000.00</Value><Currency>CNY</Currency></Amount>
+    </TransferFunds>
+  </soap:Body>
+</soap:Envelope>
+```
+
+**现在只需要 JSON：**
+```bash
+curl -X POST http://localhost:8080/gw/banking/transfer \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from_account": "622848001234",
+    "to_account": "622848005678",
+    "amount": {"amount": "10000.00", "currency_code": "CNY", "precision": 2},
+    "description": "房租转账",
+    "idempotency_key": "TXN-2024-001"
+  }'
+```
+
+**响应：**
+```json
+{
+  "transaction_id": "TXN-20240115-001",
+  "status": "COMPLETED",
+  "amount": {"amount": "10000.00", "currency_code": "CNY"},
+  "balance_after": {"amount": "50000.00", "currency_code": "CNY"}
+}
+```
+
+### Step 6: 同步获得的全部平台能力
+
+转换完成后，以下所有能力**自动生效**，无需额外配置：
+
+| 能力 | 访问方式 | 说明 |
+|------|---------|------|
+| **REST API** | `http://localhost:8080/gw/banking/*` | 6 个 JSON REST 端点 |
+| **API 文档** | `http://localhost:8080/api/v1/docs` | Swagger UI 在线浏览和调试 |
+| **在线调试** | `http://localhost:8080/explorer` | 类 Postman 的 API Explorer |
+| **Agent Prompt** | `http://localhost:8080/api/v1/docs/agent-prompt` | AI Agent 可直接消费的接口描述 |
+| **SDK 代码** | `http://localhost:8080/api/v1/docs/sdk/typescript` | TypeScript/Python/Java/Go 客户端代码 |
+| **沙箱 Mock** | `/sandbox/banking/*` + `X-Sandbox-Mode: mock` | 无需真实后端即可联调 |
+| **沙箱 Replay** | `/sandbox/banking/*` + `X-Sandbox-Mode: replay` | 录制回放用于回归测试 |
+| **沙箱 Proxy** | `/sandbox/banking/*` + `X-Sandbox-Mode: proxy` | 真实代理+自动录制+租户隔离 |
+| **限流保护** | 自动 | 令牌桶限流（SOAP 默认 1000 QPS） |
+| **熔断保护** | 自动 | 后端故障时自动熔断，防止雪崩 |
+| **并发控制** | 自动 | 信号量限制（CLI 10, SSH 5, PTY 3） |
+| **投递保障** | 按路由配置 | at_most_once / at_least_once / exactly_once |
+| **自动重试** | 按路由配置 | 指数退避 1s→5s→30s→5min→30min |
+| **死信管理** | `http://localhost:8080/compensation` | Web 界面查看/重推/标记已处理 |
+| **Webhook 推送** | `http://localhost:8080/webhooks` | 事件推送到下游系统 |
+| **链路追踪** | Grafana Tempo | 每个请求的完整调用链瀑布流 |
+| **监控指标** | Grafana Dashboard | QPS / 延迟 P99 / 错误率 / 熔断状态 |
+| **告警通知** | Slack / 钉钉 | 熔断打开、死信增长自动告警 |
+
+### 其他接口类型的转换示例
+
+**CLI 命令行工具 → REST API：**
+```bash
+# 将运维工具的 --help 输出转为 REST API
+tool --help > tool-help.txt
+api-anything codegen -s tool-help.txt -t cli -p ops-tool --workspace ./generated
+
+# 之后可以这样调用：
+curl -X POST http://localhost:8080/gw/ops-tool/deploy \
+  -d '{"app": "web-api", "env": "production", "version": "v2.1"}'
+```
+
+**SSH 远程命令 → REST API：**
+```bash
+# 编写 SSH 交互样例文件，描述可执行的命令
+api-anything codegen -s switch-commands.txt -t ssh -p network-switch --workspace ./generated
+
+# 之后可以这样调用：
+curl http://localhost:8080/gw/api/bgp/summary
+# 等同于 SSH 登录交换机执行 "show bgp summary"
+```
+
+**OData 服务 → REST API：**
+```bash
+# 下载 OData $metadata
+curl http://old-erp-server/\$metadata > erp-metadata.xml
+api-anything codegen -s erp-metadata.xml -t odata -p erp-api --workspace ./generated
+
+# 之后可以这样调用：
+curl "http://localhost:8080/gw/Products?\$filter=Status eq 'Active'&\$top=10"
+```
+
+---
+
 ## 项目结构
 
 ```
