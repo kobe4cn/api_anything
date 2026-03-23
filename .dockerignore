@@ -1,0 +1,10 @@
+target/
+generated/
+.git/
+node_modules/
+web/node_modules/
+web/dist/
+test-reports/
+.superpowers/
+docs/
+*.md
