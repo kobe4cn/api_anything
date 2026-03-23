@@ -4,10 +4,11 @@
 
 ![Rust](https://img.shields.io/badge/Rust-1.82+-orange?logo=rust)
 ![License](https://img.shields.io/badge/License-MIT-blue)
-![Tests](https://img.shields.io/badge/Tests-307%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-342%20passed-brightgreen)
 ![Crates](https://img.shields.io/badge/Crates-10-purple)
+![LLM Providers](https://img.shields.io/badge/LLM%20Providers-7-green)
 
-> **10** Rust Crates | **8** Web 页面 | **307** 自动化测试 | **4** 协议适配器 | **16** 前端截图
+> **10** Rust Crates | **8** Web 页面 | **342** 自动化测试 | **6** 协议类型 | **7** LLM 厂商 | **16** 前端截图
 
 ---
 
@@ -35,13 +36,14 @@
 
 API-Anything 是一个基于 **LLM 和 Rust 生态** 构建的全自动企业级 API 网关生成平台。它面向拥有大量遗留系统的企业，解决一个普遍而棘手的问题：**如何以最低成本将 SOAP Web Service、命令行工具、SSH 终端设备、PTY 交互程序等非 REST 系统，安全、高效地现代化为标准的 REST API**。
 
-传统方案要么需要人工逐个编写适配层（高成本、低效率），要么依赖运行时 AI 推理（不可控、高延迟）。API-Anything 走了第三条路：**离线阶段由 LLM 理解契约语义并生成元数据，运行时完全确定性执行，零 AI 依赖**。这种「AI 辅助设计期，确定性保障运行期」的架构，兼顾了智能化和可靠性。
+传统方案要么需要人工逐个编写适配层（高成本、低效率），要么依赖运行时 AI 推理（不可控、高延迟）。API-Anything 走了第三条路：**离线阶段由 LLM 驱动代码生成引擎，直接产出可编译的 Rust 插件（.so/.dylib），运行时完全确定性执行，零 AI 依赖**。这种「AI 驱动设计期，确定性保障运行期」的架构，兼顾了智能化和可靠性。
 
 核心理念：
 
-- **元数据驱动** — PostgreSQL 中的契约、路由、配置是唯一事实源，一次生成全平台受益
-- **AI 驱动生成** — LLM 在离线阶段理解 WSDL/CLI help/SSH 样本的语义，智能映射 REST 路由
-- **零运行时 LLM 依赖** — 运行时网关完全确定性执行，支撑千万级请求规模
+- **LLM 驱动代码生成** — 7 阶段流水线：LLM 分析语义 → 生成强类型 Rust 代码 → 编译为动态库 → 自动热加载
+- **多厂商 LLM 支持** — 7 家 LLM 厂商（Anthropic/OpenAI/Gemini/GLM/Qwen/Kimi/DeepSeek）统一适配
+- **6 种协议适配** — SOAP/OData/OpenAPI/CLI/SSH/PTY 全覆盖，一键转为 REST API
+- **零运行时 LLM 依赖** — 生成的插件是原生 Rust 编译产物，运行时完全确定性执行，支撑千万级请求规模
 
 ---
 
@@ -49,8 +51,9 @@ API-Anything 是一个基于 **LLM 和 Rust 生态** 构建的全自动企业级
 
 | | 功能 | 描述 |
 |---|---|---|
-| 🔄 | **四协议适配** | SOAP/CLI/SSH/PTY 统一通过 `ProtocolAdapter` trait 适配，一键转为 REST API |
-| 🧠 | **AI 驱动生成** | LLM 理解契约语义，智能映射 REST 路由命名和参数结构，确定性算法兜底 |
+| 🔄 | **六协议适配** | SOAP/OData/OpenAPI/CLI/SSH/PTY 统一通过 `ProtocolAdapter` trait 适配，一键转为 REST API |
+| 🧠 | **LLM 代码生成引擎** | 7 阶段流水线：LLM 分析语义 → 生成 Rust 源码 → 编译 .so/.dylib → 失败自动修复 → 热加载上线 |
+| 🤖 | **7 家 LLM 厂商** | Anthropic/OpenAI/Gemini/GLM/Qwen/Kimi/DeepSeek 统一适配，自由切换 |
 | 🛡️ | **三层后端保护** | 令牌桶限流 + 滑动窗口熔断（三态） + 并发信号量，协议感知默认值 |
 | 🧪 | **三模式沙箱** | Mock（Schema 驱动）/ Replay（录制回放）/ Proxy（真实代理），分层联调 |
 | 🔁 | **数据补偿引擎** | 自动指数退避重试 + 幂等键精确一次 + 死信管理 API |
@@ -89,10 +92,11 @@ API-Anything 是一个基于 **LLM 和 Rust 生态** 构建的全自动企业级
 └─────────┘ └────┬────┘ └────────┘ └───────────┘
                  │
            ┌─────▼─────┐
-           │ 遗留系统    │
-           │ SOAP/CLI/  │
-           │ SSH/PTY    │
-           └───────────┘
+           │ 遗留系统         │
+           │ SOAP/OData/     │
+           │ OpenAPI/CLI/    │
+           │ SSH/PTY         │
+           └────────────────┘
 
   ┌─────────────────────────────────────────────────┐
   │     横切关注点 (所有组件共享)                      │
@@ -179,18 +183,30 @@ cargo build --release
 cargo run --release -p api-anything-platform-api
 ```
 
-### 5. 第一个 WSDL → REST 转换
+### 5. 第一个 WSDL → REST 转换（LLM 代码生成）
 
 ```bash
-# 使用 CLI 工具从 WSDL 生成 REST API
+# 使用 codegen 命令，LLM 驱动全自动生成 Rust 插件
+cargo run -p api-anything-cli -- codegen \
+  -s docs/test-data/complex-order-service.wsdl \
+  -t soap \
+  -p my-first-api \
+  --workspace ./workspace
+
+# 输出：
+#   [Stage 1] LLM analyzing interface semantics...
+#   [Stage 2] LLM generating Rust source code...
+#   [Stage 3] Compiling plugin... OK (353 lines, 4.9M)
+#   [Stage 5] Generating OpenAPI 3.0 spec...
+#   [Stage 7] Plugin loaded, 5 routes registered
+```
+
+也支持传统的元数据生成模式（不依赖 LLM）：
+
+```bash
 cargo run -p api-anything-cli -- generate \
   --source docs/test-data/complex-order-service.wsdl \
   --project my-first-api
-
-# 输出：
-#   Contract ID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-#   Routes created: N
-#   OpenAPI spec: docs/test-data/complex-order-service.wsdl.openapi.json
 ```
 
 ### 6. 访问 Web 管理平台
@@ -221,7 +237,8 @@ api-anything/
 │   ├── event-bus/             事件总线（PG 默认 + Kafka 可选）
 │   ├── plugin-sdk/            插件 SDK（C ABI 接口 + export_plugin! 宏）
 │   ├── platform-api/          统一 HTTP 后端（Axum 路由 + 中间件 + 静态文件托管）
-│   └── cli/                   命令行工具（generate / generate-ssh / generate-cli）
+│   └── cli/                   命令行工具（codegen / generate / generate-ssh / generate-cli）
+│       └── codegen/           LLM 代码生成引擎（7 阶段编排 + prompt 模板 + 编译器 + 脚手架）
 ├── web/                       React 18 + TypeScript + Vite + TailwindCSS 前端
 │   └── src/pages/             8 个功能页面
 ├── docker/                    Docker Compose 编排（8 个服务）
@@ -236,35 +253,123 @@ api-anything/
 |-------|------|
 | `common` | 公共类型定义（`SourceType`、`ProtocolType`、`DeliveryGuarantee`）、配置加载、错误类型 |
 | `metadata` | PostgreSQL 元数据仓库的 `MetadataRepo` trait 和 `PgMetadataRepo` 实现 |
-| `generator` | 7 阶段生成流水线：解析 → 统一建模 → LLM 增强映射 → 持久化 → OpenAPI/Agent Prompt 生成 |
+| `generator` | 元数据生成流水线：解析 → 统一建模 → LLM 增强映射 → 持久化 → OpenAPI/Agent Prompt 生成 |
+| `cli/codegen` | LLM 代码生成引擎：7 阶段流水线（语义分析 → Rust 源码 → 编译 → 测试 → OpenAPI → 热加载） |
 | `gateway` | 在线网关运行时：4 种协议适配器 + 三层保护 + ArcSwap 动态路由 + 错误规范化 |
 | `sandbox` | 沙箱测试平台：MockLayer（Schema 驱动）+ ReplayLayer（录制回放）+ ProxyLayer（真实代理） |
 | `compensation` | 数据补偿引擎：投递记录 → 指数退避重试 → 幂等去重 → 死信管理 |
 | `event-bus` | 事件总线抽象层：`EventBus` trait + PG 轮询实现 + Kafka 可选实现 |
 | `plugin-sdk` | 插件开发 SDK：`PluginInfo`/`PluginRequest`/`PluginResponse` 类型 + `export_plugin!` 宏 |
 | `platform-api` | 统一 HTTP API 入口：Axum 路由注册、中间件管道、SPA 静态文件兜底 |
-| `cli` | 命令行工具：`generate`（WSDL）、`generate-ssh`（SSH）、`generate-cli`（CLI）三个子命令 |
+| `cli` | 命令行工具：`codegen`（LLM 代码生成）、`generate`（WSDL）、`generate-ssh`（SSH）、`generate-cli`（CLI）四个子命令 |
 
 ---
 
 ## 核心模块详解
 
-### 生成引擎 (generator)
+### LLM 驱动代码生成引擎 (codegen)
 
-生成引擎采用 **7 阶段流水线**，将遗留系统契约自动转换为 REST API 元数据：
+这是 API-Anything 的核心能力。不同于传统的"确定性规则映射"，代码生成引擎实现了真正的 **LLM 驱动 7 阶段代码生成流水线**，直接从接口定义生成可编译、可运行的 Rust 插件：
+
+```
+输入（WSDL/OData/CLI/SSH/PTY）
+  → Stage 1: LLM 分析接口语义
+  → Stage 2: LLM 生成强类型 Rust 源码（serde struct + ProtocolAdapter）
+  → Stage 3: cargo build 编译为 .so/.dylib（失败自动反馈 LLM 修正，最多 5 次）
+  → Stage 4: LLM 生成影子测试代码
+  → Stage 5: LLM 提取路由信息 → 生成 OpenAPI 3.0
+  → Stage 6: 观测注入（代码中包含 #[tracing::instrument]）
+  → Stage 7: 产物存储 → PluginManager 热加载 → 网关路由自动注册
+```
+
+**核心模块组成：**
+
+| 模块 | 文件 | 职责 |
+|------|------|------|
+| 编排引擎 | `codegen/mod.rs` | 7 阶段流水线编排，统一入口 |
+| Prompt 模板 | `codegen/prompts.rs` | 6 种接口类型的 LLM prompt 模板 |
+| 编译器 | `codegen/compiler.rs` | cargo build + 编译失败自动反馈 LLM 修复（最多 5 轮） |
+| 脚手架 | `codegen/scaffold.rs` | 临时 crate 脚手架生成（Cargo.toml + lib.rs） |
+| 参考代码 | `codegen/reference_plugins.rs` | 6 种接口的可编译参考代码，作为 LLM few-shot 示例 |
+
+**支持的输入类型（6 种协议）：**
+
+| 输入类型 | 解析器 | 解析策略 |
+|---------|--------|---------|
+| WSDL (SOAP) | `WsdlParser` | quick-xml 结构化解析 portType/binding/service/types |
+| OData $metadata | 原生支持 | EntityType/EntitySet/NavigationProperty 解析 |
+| OpenAPI 3.0 | 原生支持 | paths/schemas/parameters 解析 |
+| CLI --help | `CliHelpParser` | Clap/ArgParse 风格参数识别，支持主命令 + 子命令 |
+| SSH 样本 | `SshSampleParser` | 自定义 `## Command:` 块格式解析 |
+| PTY 交互 | 原生支持 | Expect 模式 prompt/command/output 解析 |
+
+**LLM 生成代码示例（SOAP Banking TransferFundsRequest）：**
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransferFundsRequest {
+    pub from_account: String,
+    pub to_account: String,
+    pub amount: f64,
+    pub currency: String,
+    pub reference: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransferFundsResponse {
+    pub transaction_id: String,
+    pub status: TransferStatus,
+    pub timestamp: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TransferStatus {
+    Completed,
+    Pending,
+    Failed,
+}
+```
+
+**LLM 代码生成实测结果（全部通过）：**
+
+| 接口类型 | 测试场景 | 路由数 | 生成代码行数 | 插件大小 |
+|---------|---------|--------|------------|---------|
+| SOAP | 计算器（简单） | 2 | ~200 行 | .dylib |
+| SOAP | 订单系统（复杂嵌套） | 5 | 353 行 | 4.9M |
+| SOAP | 银行系统（枚举/decimal） | 6 | 491 行 | .dylib |
+| OData | 产品服务（5 EntityType） | 20 | 167 行 | 3.3M |
+| OpenAPI | Petstore（CRUD+嵌套） | 7 | 170 行 | 3.3M |
+| CLI | 数据库工具 | 10 | ~150 行 | 2.1M |
+| CLI | DevOps 工具（8 子命令） | 6 | 154 行 | 2.1M |
+| SSH | 网络交换机 | 6 | ~200 行 | 2.2M |
+| SSH | 服务器管理 | 7 | ~300 行 | 563K |
+| SSH | 企业路由器（BGP/OSPF） | 12 | 447 行 | .dylib |
+| PTY | MySQL REPL | 4 | ~200 行 | 2.2M |
+| PTY | Redis CLI（5 种数据结构） | 18 | 377 行 | 2.1M |
+| **合计** | **12 场景** | **103 路由** | | |
+
+### 多厂商 LLM 支持
+
+代码生成引擎支持 **7 家 LLM 厂商**，通过统一的 Provider 抽象层适配不同 API 格式：
+
+| 厂商 | Provider 值 | 默认模型 | API 格式 |
+|------|------------|---------|---------|
+| Anthropic | `anthropic` | claude-sonnet-4 | Claude Messages API |
+| OpenAI | `openai` | gpt-4o | OpenAI Chat |
+| Google | `gemini` | gemini-2.0-flash | Gemini API |
+| 智谱 | `glm` | glm-4-flash | OpenAI 兼容 |
+| 通义千问 | `qwen` | qwen-max | OpenAI 兼容 |
+| 月之暗面 | `kimi` | moonshot-v1-128k | OpenAI 兼容 |
+| DeepSeek | `deepseek` | deepseek-chat | OpenAI 兼容 |
+
+### 元数据生成引擎 (generator)
+
+除 LLM 代码生成引擎外，元数据生成引擎仍采用 **7 阶段流水线**，将遗留系统契约自动转换为 REST API 元数据：
 
 ```
 输入契约 → [1]解析 → [2]统一建模 → [3]LLM增强映射 → [4]持久化
          → [5]后端绑定创建 → [6]路由注册 → [7]OpenAPI/Agent Prompt 生成
 ```
-
-**支持的输入类型：**
-
-| 输入类型 | 解析器 | 解析策略 |
-|---------|--------|---------|
-| WSDL (SOAP) | `WsdlParser` | quick-xml 结构化解析 portType/binding/service/types |
-| CLI --help | `CliHelpParser` | Clap/ArgParse 风格参数识别，支持主命令 + 子命令 |
-| SSH 样本 | `SshSampleParser` | 自定义 `## Command:` 块格式解析 |
 
 **LLM 增强映射：** `LlmEnhancedMapper` 调用 Claude/OpenAI API 理解操作语义，为 REST 路由选择合理的 HTTP 方法和 URL 路径。当 LLM 不可用时，`WsdlMapper`/`CliMapper`/`SshMapper` 提供确定性降级方案。
 
@@ -282,7 +387,7 @@ api-anything/
 | `CliProcessAdapter` | 命令行工具 | `tokio::process` + `.arg()` 安全传参 |
 | `SshRemoteAdapter` | SSH 远程命令 | 系统 `ssh` 二进制包装 |
 | `PtyExpectAdapter` | PTY 交互程序 | Expect 状态机 stdin/stdout pipe |
-| Plugin (.so) | 用户自定义 | C ABI `libloading` 动态加载 |
+| Plugin (.so/.dylib) | SOAP/OData/OpenAPI/CLI/SSH/PTY | LLM 生成 + C ABI `libloading` 动态加载 |
 
 **动态路由：** 使用 `ArcSwap` 实现 RCU（Read-Copy-Update）热加载，路由表更新对读路径零锁开销。
 
@@ -460,6 +565,20 @@ React 18 + TypeScript + TailwindCSS 构建的 SPA，8 个功能页面：
 
 ## CLI 工具
 
+### codegen — LLM 驱动代码生成（核心命令）
+
+```bash
+cargo run -p api-anything-cli -- codegen \
+  -s <source-file> \
+  -t <interface-type> \
+  -p <project-name> \
+  --workspace <dir>
+```
+
+从接口定义文件出发，通过 LLM 驱动的 7 阶段流水线，直接生成可编译的 Rust 插件（.so/.dylib），并自动注册到网关路由。
+
+**支持的 `interface-type`：** `soap`、`odata`、`openapi`、`cli`、`ssh`、`pty`
+
 ### generate — WSDL → REST
 
 ```bash
@@ -509,6 +628,11 @@ cargo run -p api-anything-cli -- generate-cli \
 | `ALERT_WEBHOOK_URL` | — | 告警通知 Webhook URL（可选） |
 | `ALERT_WEBHOOK_TYPE` | `slack` | 告警类型：`slack` 或 `dingtalk` |
 | `PLUGIN_DIR` | `./plugins` | 插件 `.so` 文件扫描目录 |
+| `LLM_PROVIDER` | `anthropic` | LLM 厂商：`anthropic`/`openai`/`gemini`/`glm`/`qwen`/`kimi`/`deepseek` |
+| `LLM_MODEL` | — | LLM 模型名称（留空则使用厂商默认模型） |
+| `LLM_API_KEY` | — | LLM API 密钥（必填，用于代码生成引擎） |
+| `LLM_BASE_URL` | — | LLM API 基础 URL（可选，用于自定义端点） |
+| `CODEGEN_MAX_FIX_ROUNDS` | `5` | 编译失败自动修复最大轮次 |
 | `RUST_LOG` | `api_anything=debug,tower_http=debug` | 日志级别（tracing-subscriber env-filter 格式） |
 
 ---
@@ -519,9 +643,10 @@ cargo run -p api-anything-cli -- generate-cli \
 
 | 指标 | 数值 |
 |------|------|
-| 自动化测试总数 | **307** |
+| 自动化测试总数 | **342** |
 | 测试通过率 | **100%** |
-| 覆盖模块 | 8 个 crate |
+| 覆盖模块 | 8 个 crate + codegen 子模块 |
+| LLM 代码生成场景 | 12 场景 / 103 路由 |
 | 前端截图 | 16 张 |
 
 ### 模块测试分布
@@ -531,15 +656,17 @@ cargo run -p api-anything-cli -- generate-cli \
 | common | 4 | 配置加载、类型序列化 |
 | gateway | 50 | 4 种适配器 + 三层保护 + 错误规范化 + 命令注入防护 |
 | generator | 47 | WSDL/CLI/SSH 解析 + LLM 映射 + OpenAPI 生成 |
+| codegen | 35 | 6 种协议代码生成 + 编译修复 + prompt 模板 + 脚手架 |
 | sandbox | 9 | Mock/Replay/Proxy 三层 + 会话管理 |
 | compensation | 6 | 重试策略 + 幂等 + 死信 |
 | metadata | 6 | 数据库 CRUD 集成测试 |
 | platform-api | 117 | 全部 API 端点 + 中间件 + 网关代理集成 |
-| cli | 4 | 三个子命令的端到端测试 |
+| cli | 4 | 四个子命令的端到端测试 |
 
 ### 测试覆盖范围
 
-- **协议适配器：** SOAP (WSDL 解析 → XML↔JSON → 网关代理)、CLI (help 解析 → tokio::process → 输出解析)、SSH (样例解析 → 系统 ssh → 输出解析)、PTY (Expect 状态机 → stdin/stdout pipe)
+- **协议适配器：** SOAP (WSDL 解析 → XML↔JSON → 网关代理)、OData ($metadata 解析 → REST CRUD)、OpenAPI (paths/schemas 解析)、CLI (help 解析 → tokio::process → 输出解析)、SSH (样例解析 → 系统 ssh → 输出解析)、PTY (Expect 状态机 → stdin/stdout pipe)
+- **LLM 代码生成：** 12 个端到端场景全部通过，覆盖 6 种协议类型，累计生成 103 条路由
 - **保护层：** 令牌桶限流 (burst → refill → reject)、滑动窗口熔断 (Closed → Open → HalfOpen)、并发信号量 (acquire → release → limit)
 - **安全：** 7 种命令注入变体防护、RFC 7807 错误格式、敏感信息泄露检查
 
@@ -638,6 +765,7 @@ cargo test
 | Phase 4 | 数据补偿引擎（重试/幂等/死信） | ✅ 85% |
 | Phase 5 | Web 门户 + PTY 适配器 | ✅ 80% |
 | Phase 6 | Explorer + SDK + Webhook + 插件 | ✅ 100% |
+| **Codegen** | **LLM 驱动代码生成引擎（7 阶段流水线 + 7 厂商 + 6 协议 + 12 场景）** | **✅ 100%** |
 
 ### 待完成
 
