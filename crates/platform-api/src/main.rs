@@ -96,8 +96,20 @@ async fn main() -> anyhow::Result<()> {
 
     let app = build_app(state);
     let addr = format!("{}:{}", config.api_host, config.api_port);
-    let listener = TcpListener::bind(&addr).await?;
-    tracing::info!("Listening on {addr}");
-    axum::serve(listener, app).await?;
+
+    // TLS 配置存在时启用 HTTPS，否则保持原有 HTTP 逻辑，
+    // 开发环境无需配置证书即可正常使用
+    if let (Some(cert), Some(key)) = (&config.tls_cert_path, &config.tls_key_path) {
+        let tls_config =
+            axum_server::tls_rustls::RustlsConfig::from_pem_file(cert, key).await?;
+        tracing::info!("Listening on https://{addr} (TLS enabled)");
+        axum_server::bind_rustls(addr.parse()?, tls_config)
+            .serve(app.into_make_service())
+            .await?;
+    } else {
+        let listener = TcpListener::bind(&addr).await?;
+        tracing::info!("Listening on http://{addr}");
+        axum::serve(listener, app).await?;
+    }
     Ok(())
 }

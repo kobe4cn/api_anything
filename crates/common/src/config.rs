@@ -9,6 +9,10 @@ pub struct AppConfig {
     pub otel_endpoint: String,
     pub api_host: String,
     pub api_port: u16,
+    // TLS 证书和私钥路径均为 None 时走 HTTP，两者同时存在时启用 HTTPS，
+    // 避免只配其中一个导致运行时才发现 TLS 初始化失败
+    pub tls_cert_path: Option<String>,
+    pub tls_key_path: Option<String>,
 }
 
 impl AppConfig {
@@ -27,6 +31,8 @@ impl AppConfig {
                 .ok()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(8080),
+            tls_cert_path: env::var("TLS_CERT_PATH").ok(),
+            tls_key_path: env::var("TLS_KEY_PATH").ok(),
         }
     }
 }
@@ -156,5 +162,37 @@ mod tests {
             base_url: None,
         };
         assert!(!config.is_available());
+    }
+
+    #[test]
+    fn app_config_tls_defaults_to_none() {
+        // 未设置 TLS 环境变量时两个字段均为 None，保持 HTTP 模式
+        let config = AppConfig {
+            database_url: "postgres://localhost/test".to_string(),
+            kafka_brokers: "localhost:9092".to_string(),
+            otel_endpoint: "http://localhost:4317".to_string(),
+            api_host: "0.0.0.0".to_string(),
+            api_port: 8080,
+            tls_cert_path: None,
+            tls_key_path: None,
+        };
+        assert!(config.tls_cert_path.is_none());
+        assert!(config.tls_key_path.is_none());
+    }
+
+    #[test]
+    fn app_config_tls_reads_paths() {
+        // 两个 TLS 路径均存在时切换到 HTTPS 模式
+        let config = AppConfig {
+            database_url: "postgres://localhost/test".to_string(),
+            kafka_brokers: "localhost:9092".to_string(),
+            otel_endpoint: "http://localhost:4317".to_string(),
+            api_host: "0.0.0.0".to_string(),
+            api_port: 8080,
+            tls_cert_path: Some("/etc/ssl/cert.pem".to_string()),
+            tls_key_path: Some("/etc/ssl/key.pem".to_string()),
+        };
+        assert_eq!(config.tls_cert_path.unwrap(), "/etc/ssl/cert.pem");
+        assert_eq!(config.tls_key_path.unwrap(), "/etc/ssl/key.pem");
     }
 }

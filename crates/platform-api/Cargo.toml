@@ -11,6 +11,7 @@ api-anything-sandbox = { path = "../sandbox" }
 api-anything-compensation = { path = "../compensation" }
 api-anything-plugin-sdk = { path = "../plugin-sdk" }
 axum.workspace = true
+axum-server.workspace = true
 tokio.workspace = true
 tower.workspace = true
 tower-http.workspace = true
